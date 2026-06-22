@@ -1,0 +1,18 @@
+appId: dev.sabin.spacetoggle
+productName: SpaceToggle
+directories:
+  output: release
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - node_modules/koffi/**
+win:
+  target:
+    - nsis
+  requestedExecutionLevel: asInvoker
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+
