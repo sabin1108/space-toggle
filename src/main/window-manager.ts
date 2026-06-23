@@ -50,13 +50,19 @@ const uniqueIdentities = (items: WindowIdentity[]): WindowIdentity[] => {
 };
 
 export class WindowManager {
+  private readonly activeWindows = new Map<string, NativeWindow>();
+
   constructor(
     private readonly state: StateRepository,
     private readonly win32: Win32Service
   ) {}
 
   listWindows(): WindowSnapshot[] {
-    return this.win32.listWindows().map((binding) => binding.snapshot);
+    const windows = this.win32.listWindows();
+    for (const item of windows) {
+      this.activeWindows.set(item.snapshot.id, item);
+    }
+    return windows.map((binding) => binding.snapshot);
   }
 
   addToGroup(group: GroupName, identity: WindowIdentity): AppState {
@@ -76,6 +82,9 @@ export class WindowManager {
   setMode(mode: Mode): OperationResult {
     const snapshot = this.state.setMode(mode);
     const windows = this.win32.listWindows();
+    for (const item of windows) {
+      this.activeWindows.set(item.snapshot.id, item);
+    }
     const work = this.bindGroup(windows, snapshot.groups.work);
     const play = this.bindGroup(windows, snapshot.groups.play);
     const failures: string[] = [];
@@ -83,7 +92,17 @@ export class WindowManager {
 
     const apply = (items: NativeWindow[], visible: boolean): void => {
       for (const item of items) {
-        const result = visible ? this.win32.showWindow(item.hwnd) : this.win32.hideWindow(item.hwnd);
+        let result: OperationResult;
+        if (visible) {
+          result = this.win32.restoreWindowVisuals(item.hwnd);
+        } else {
+          const hideRes = this.win32.hideWindow(item.hwnd);
+          const excludeRes = this.win32.excludeFromAltTab(item.hwnd);
+          result = {
+            ok: hideRes.ok && excludeRes.ok,
+            message: `Hide: ${hideRes.message}, Exclude: ${excludeRes.message}`
+          };
+        }
         if (result.ok) {
           changedCount += 1;
         } else {
@@ -182,7 +201,16 @@ export class WindowManager {
     const bound: NativeWindow[] = [];
 
     for (const identity of identities) {
-      const match = windows.find((window) => matchesIdentity(window.snapshot, identity));
+      let match = windows.find((window) => matchesIdentity(window.snapshot, identity));
+      if (!match) {
+        for (const item of this.activeWindows.values()) {
+          if (this.win32.isWindow(item.hwnd) && matchesIdentity(item.snapshot, identity)) {
+            match = item;
+            break;
+          }
+        }
+      }
+
       if (match) {
         bound.push(match);
       } else {
@@ -194,8 +222,19 @@ export class WindowManager {
   }
 
   private bindOne(identity: WindowIdentity): NativeWindow | undefined {
-    return this.win32
-      .listWindows()
-      .find((window) => matchesIdentity(window.snapshot, identity));
+    const windows = this.win32.listWindows();
+    for (const item of windows) {
+      this.activeWindows.set(item.snapshot.id, item);
+    }
+    let match = windows.find((window) => matchesIdentity(window.snapshot, identity));
+    if (!match) {
+      for (const item of this.activeWindows.values()) {
+        if (this.win32.isWindow(item.hwnd) && matchesIdentity(item.snapshot, identity)) {
+          match = item;
+          break;
+        }
+      }
+    }
+    return match;
   }
 }
