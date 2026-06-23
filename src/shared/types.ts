@@ -43,6 +43,7 @@ export interface AppState {
   };
   dropZone: DropZoneState;
   lastCleanShutdown: boolean;
+  customHotkey?: string;
 }
 
 export interface OperationResult {
@@ -69,4 +70,6 @@ export interface SpaceToggleApi {
   restoreWindowVisuals(identity: WindowIdentity): Promise<OperationResult>;
   forceRestore(): Promise<OperationResult>;
   getHotkeyStatus(): Promise<HotkeyStatus>;
+  updateHotkey(accelerator: string): Promise<HotkeyStatus>;
 }
+

@@ -85,5 +85,11 @@ export class StateRepository {
     next.groups[group] = next.groups[group].filter((item) => identityKey(item) !== targetKey);
     return this.replace(next);
   }
+
+  setCustomHotkey(hotkey: string): AppState {
+    const next = this.get();
+    next.customHotkey = hotkey;
+    return this.replace(next);
+  }
 }
 

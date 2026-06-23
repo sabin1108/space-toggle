@@ -320,3 +320,50 @@ h2 {
     flex-direction: column;
   }
 }
+
+/* Hotkey Editing styles */
+.hotkey-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hotkey-recorder-input {
+  width: 190px;
+  min-height: 30px;
+  border: 1px solid #cfd3c8;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 13px;
+  background: #ffffff;
+  color: #20211d;
+  text-align: center;
+  font-weight: 700;
+}
+
+.hotkey-recorder-input:focus {
+  outline: none;
+  border-color: #7c8b60;
+  box-shadow: 0 0 0 2px rgba(124, 139, 96, 0.2);
+}
+
+.hotkey-btn {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.hotkey-edit-btn {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-color: #c9cdc2;
+  background: #f7f7f2;
+}
+
+.hotkey-edit-btn:hover {
+  background: #eff1e9;
+  border-color: #a4ad96;
+}
+

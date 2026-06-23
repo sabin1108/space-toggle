@@ -94,8 +94,8 @@ if (!singleInstanceLock) {
     const recoveryResult = windowManager.recoverAfterCrashIfNeeded();
 
     mainWindow = createMainWindow();
-    hotkeys = new HotkeyController(windowManager);
-    const hotkeyStatus = hotkeys.register();
+    hotkeys = new HotkeyController(windowManager, stateRepository);
+    const hotkeyStatus = hotkeys.register(stateRepository.get().customHotkey);
     log(`Hotkey registered: ${hotkeyStatus.registered}`);
 
     registerIpcHandlers(stateRepository, windowManager, hotkeys);

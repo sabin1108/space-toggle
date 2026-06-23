@@ -8,5 +8,6 @@ export const IPC_CHANNELS = {
   EXCLUDE_FROM_ALT_TAB: 'spacetoggle:exclude-from-alt-tab',
   RESTORE_WINDOW_VISUALS: 'spacetoggle:restore-window-visuals',
   FORCE_RESTORE: 'spacetoggle:force-restore',
-  GET_HOTKEY_STATUS: 'spacetoggle:get-hotkey-status'
+  GET_HOTKEY_STATUS: 'spacetoggle:get-hotkey-status',
+  UPDATE_HOTKEY: 'spacetoggle:update-hotkey'
 } as const;

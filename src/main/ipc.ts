@@ -27,6 +27,10 @@ export const registerIpcHandlers = (
   ipcMain.handle(IPC_CHANNELS.GET_STATE, () => state.get());
   ipcMain.handle(IPC_CHANNELS.LIST_WINDOWS, () => windows.listWindows());
   ipcMain.handle(IPC_CHANNELS.GET_HOTKEY_STATUS, () => hotkeys.getStatus());
+  ipcMain.handle(IPC_CHANNELS.UPDATE_HOTKEY, (_event, payload: unknown) => {
+    const accelerator = z.string().trim().min(1).parse(payload);
+    return hotkeys.update(accelerator);
+  });
   ipcMain.handle(IPC_CHANNELS.TOGGLE_MODE, () => windows.toggleMode());
   ipcMain.handle(IPC_CHANNELS.FORCE_RESTORE, () => windows.forceRestore());
   ipcMain.handle(IPC_CHANNELS.EXCLUDE_FROM_ALT_TAB, (_event, payload: unknown) => {

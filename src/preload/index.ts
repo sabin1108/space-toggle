@@ -16,7 +16,8 @@ const api: SpaceToggleApi = {
   restoreWindowVisuals: (identity: WindowIdentity) =>
     ipcRenderer.invoke(IPC_CHANNELS.RESTORE_WINDOW_VISUALS, identity),
   forceRestore: () => ipcRenderer.invoke(IPC_CHANNELS.FORCE_RESTORE),
-  getHotkeyStatus: () => ipcRenderer.invoke(IPC_CHANNELS.GET_HOTKEY_STATUS)
+  getHotkeyStatus: () => ipcRenderer.invoke(IPC_CHANNELS.GET_HOTKEY_STATUS),
+  updateHotkey: (accelerator: string) => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_HOTKEY, accelerator)
 };
 
 contextBridge.exposeInMainWorld('spaceToggle', api);

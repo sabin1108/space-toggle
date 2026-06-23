@@ -61,6 +61,76 @@ export const App = (): JSX.Element => {
   const [hotkey, setHotkey] = useState<HotkeyStatus | null>(null);
   const [message, setMessage] = useState<string>('Ready');
   const [query, setQuery] = useState('');
+  const [isEditingHotkey, setIsEditingHotkey] = useState(false);
+  const [recordedKeys, setRecordedKeys] = useState('');
+
+  const startHotkeyEditing = (): void => {
+    setRecordedKeys(hotkey?.accelerator || '');
+    setIsEditingHotkey(true);
+  };
+
+  const cancelHotkeyEditing = (): void => {
+    setIsEditingHotkey(false);
+  };
+
+  const handleHotkeyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const parts: string[] = [];
+
+    if (e.ctrlKey || e.metaKey) {
+      parts.push('CommandOrControl');
+    }
+    if (e.altKey) {
+      parts.push('Alt');
+    }
+    if (e.shiftKey) {
+      parts.push('Shift');
+    }
+
+    const key = e.key;
+    const isModifierOnly = ['Control', 'Alt', 'Shift', 'Meta'].includes(key);
+
+    if (!isModifierOnly) {
+      let keyName = key;
+      if (keyName === ' ') {
+        keyName = 'Space';
+      } else if (keyName === '+') {
+        keyName = 'Plus';
+      } else if (keyName.length === 1) {
+        keyName = keyName.toUpperCase();
+      } else if (keyName.startsWith('Arrow')) {
+        keyName = keyName.replace('Arrow', '');
+      } else if (keyName === 'Escape') {
+        keyName = 'Esc';
+      }
+      
+      parts.push(keyName);
+    }
+
+    const combination = parts.join('+');
+    setRecordedKeys(combination);
+  };
+
+  const saveHotkey = async (): Promise<void> => {
+    if (!recordedKeys) {
+      return;
+    }
+    try {
+      const result = await window.spaceToggle.updateHotkey(recordedKeys);
+      setHotkey(result);
+      if (result.registered) {
+        setMessage(`Hotkey changed to ${result.accelerator}`);
+        setIsEditingHotkey(false);
+      } else {
+        setMessage(result.error || 'Failed to update hotkey.');
+        setIsEditingHotkey(false);
+      }
+    } catch (err) {
+      setMessage(String(err));
+    }
+  };
 
   const refresh = async (): Promise<void> => {
     const [nextState, nextWindows, nextHotkey] = await Promise.all([
@@ -145,9 +215,28 @@ export const App = (): JSX.Element => {
           <span className={`mode-pill mode-${state.currentMode.toLocaleLowerCase()}`}>
             {modeLabel[state.currentMode]}
           </span>
-          <span className={hotkey?.registered ? 'signal ok' : 'signal warn'}>
-            {hotkey?.registered ? hotkey.accelerator : 'Hotkey unavailable'}
-          </span>
+          {isEditingHotkey ? (
+            <div className="hotkey-container">
+              <input
+                className="hotkey-recorder-input"
+                value={recordedKeys}
+                readOnly
+                placeholder="Press keys..."
+                onKeyDown={handleHotkeyKeyDown}
+              />
+              <button className="hotkey-btn" onClick={saveHotkey}>Save</button>
+              <button className="hotkey-btn danger" onClick={cancelHotkeyEditing}>Cancel</button>
+            </div>
+          ) : (
+            <div className="hotkey-container">
+              <span className={hotkey?.registered ? 'signal ok' : 'signal warn'}>
+                {hotkey?.registered ? hotkey.accelerator : 'Hotkey unavailable'}
+              </span>
+              <button className="hotkey-edit-btn" onClick={startHotkeyEditing}>
+                Edit
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
