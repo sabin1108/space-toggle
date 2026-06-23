@@ -37,6 +37,25 @@ const SWP_NOMOVE = 0x0002;
 const SWP_NOZORDER = 0x0004;
 const SWP_NOACTIVATE = 0x0010;
 const SWP_FRAMECHANGED = 0x0020;
+const GW_OWNER = 4;
+
+const SYSTEM_PROCESS_BLACKLIST = [
+  'textinputhost.exe',
+  'searchhost.exe',
+  'startmenuexperiencehost.exe',
+  'shellexperiencehost.exe',
+  'lockapp.exe',
+  'systemsettings.exe',
+  'peopleexperiencehost.exe'
+];
+
+const SYSTEM_CLASS_BLACKLIST = [
+  'shell_traywnd',
+  'dv2controlhost',
+  'workerw',
+  'progman',
+  'notifyiconoverflowwindow'
+];
 
 const pointerObjectIds = new WeakMap<object, string>();
 let pointerObjectCounter = 0;
@@ -133,6 +152,7 @@ class KoffiWin32Service implements Win32Service {
   );
   private readonly IsWindow = this.user32.func('bool __stdcall IsWindow(void *hWnd)');
   private readonly IsWindowVisible = this.user32.func('bool __stdcall IsWindowVisible(void *hWnd)');
+  private readonly GetWindow = this.user32.func('void * __stdcall GetWindow(void *hWnd, uint32 uCmd)');
   private readonly GetWindowTextLengthW = this.user32.func(
     'int __stdcall GetWindowTextLengthW(void *hWnd)'
   );
@@ -176,6 +196,18 @@ class KoffiWin32Service implements Win32Service {
         return true;
       }
 
+      // 1. Owner Window Filter
+      const owner = this.GetWindow(hwnd, GW_OWNER);
+      if (owner !== null) {
+        return true;
+      }
+
+      // 2. Tool Window Style Filter
+      const style = numeric(this.GetWindowLongPtrW(hwnd, GWL_EXSTYLE));
+      if ((style & WS_EX_TOOLWINDOW) !== 0 && (style & WS_EX_APPWINDOW) === 0) {
+        return true;
+      }
+
       const title = this.getWindowTitle(hwnd);
       if (!title) {
         return true;
@@ -186,7 +218,22 @@ class KoffiWin32Service implements Win32Service {
         return true;
       }
 
+      // 3. Process Blacklist Filter
+      const pathParts = processPath.split(/[\\/]/g);
+      const processName = (pathParts[pathParts.length - 1] || '').toLowerCase();
+      if (SYSTEM_PROCESS_BLACKLIST.includes(processName)) {
+        return true;
+      }
+
       const className = this.getClassName(hwnd);
+      // 4. Class Blacklist Filter
+      if (className) {
+        const clsLower = className.toLowerCase();
+        if (SYSTEM_CLASS_BLACKLIST.includes(clsLower)) {
+          return true;
+        }
+      }
+
       const rect = this.getRect(hwnd);
 
       bindings.push({
