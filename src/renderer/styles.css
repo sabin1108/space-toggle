@@ -163,14 +163,68 @@ h2 {
 
 .message-line {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   min-height: 34px;
   border: 1px solid #ded6bf;
   border-radius: 6px;
   background: #fff9ea;
   padding: 8px 10px;
   color: #4b4029;
+  transition: all 0.2s ease;
+}
+
+.message-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.message-line.success {
+  background: #edf5e5;
+  border-color: #c9e0b8;
+  color: #243d15;
+}
+
+.message-line.error {
+  background: #fde8e8;
+  border-color: #f8b4b4;
+  color: #9b1c1c;
+}
+
+.message-line.info {
+  background: #fff9ea;
+  border-color: #ded6bf;
+  color: #4b4029;
+}
+
+.failures-details {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 6px;
+  font-size: 12.5px;
+}
+
+.message-line.error .failures-details {
+  border-top-color: rgba(155, 28, 28, 0.15);
+}
+
+.failures-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  outline: none;
+  user-select: none;
+}
+
+.failures-list {
+  margin: 6px 0 0 0;
+  padding-left: 20px;
+  list-style-type: square;
+}
+
+.failures-list li {
+  margin-top: 3px;
+  word-break: break-all;
 }
 
 .workspace {

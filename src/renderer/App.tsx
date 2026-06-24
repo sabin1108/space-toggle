@@ -1,6 +1,9 @@
 import {
+  AlertCircle,
   BriefcaseBusiness,
+  CheckCircle,
   Gamepad2,
+  Info,
   ListRestart,
   MonitorUp,
   RefreshCw,
@@ -60,6 +63,8 @@ export const App = (): JSX.Element => {
   const [windows, setWindows] = useState<WindowSnapshot[]>([]);
   const [hotkey, setHotkey] = useState<HotkeyStatus | null>(null);
   const [message, setMessage] = useState<string>('Ready');
+  const [messageType, setMessageType] = useState<'info' | 'success' | 'error'>('info');
+  const [failures, setFailures] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [isEditingHotkey, setIsEditingHotkey] = useState(false);
   const [recordedKeys, setRecordedKeys] = useState('');
@@ -122,13 +127,19 @@ export const App = (): JSX.Element => {
       setHotkey(result);
       if (result.registered) {
         setMessage(`Hotkey changed to ${result.accelerator}`);
+        setMessageType('success');
+        setFailures([]);
         setIsEditingHotkey(false);
       } else {
         setMessage(result.error || 'Failed to update hotkey.');
+        setMessageType('error');
+        setFailures([]);
         setIsEditingHotkey(false);
       }
     } catch (err) {
       setMessage(String(err));
+      setMessageType('error');
+      setFailures([]);
     }
   };
 
@@ -144,7 +155,11 @@ export const App = (): JSX.Element => {
   };
 
   useEffect(() => {
-    refresh().catch((error) => setMessage(String(error)));
+    refresh().catch((error) => {
+      setMessage(String(error));
+      setMessageType('error');
+      setFailures([]);
+    });
   }, []);
 
   const filteredWindows = useMemo(() => {
@@ -164,39 +179,74 @@ export const App = (): JSX.Element => {
   const runOperation = async (operation: Promise<OperationResult>): Promise<void> => {
     const result = await operation;
     setMessage(result.message);
+    if (result.ok) {
+      setMessageType('success');
+      setFailures([]);
+    } else {
+      setMessageType('error');
+      setFailures(result.failures || []);
+    }
     await refresh();
   };
 
   const setMode = (mode: Mode): void => {
-    runOperation(window.spaceToggle.setMode(mode)).catch((error) => setMessage(String(error)));
+    runOperation(window.spaceToggle.setMode(mode)).catch((error) => {
+      setMessage(String(error));
+      setMessageType('error');
+      setFailures([]);
+    });
   };
 
   const forceRestore = (): void => {
-    runOperation(window.spaceToggle.forceRestore()).catch((error) => setMessage(String(error)));
+    runOperation(window.spaceToggle.forceRestore()).catch((error) => {
+      setMessage(String(error));
+      setMessageType('error');
+      setFailures([]);
+    });
   };
 
   const excludeFromAltTab = (identity: WindowIdentity): void => {
-    runOperation(window.spaceToggle.excludeFromAltTab(identity)).catch((error) =>
-      setMessage(String(error))
-    );
+    runOperation(window.spaceToggle.excludeFromAltTab(identity)).catch((error) => {
+      setMessage(String(error));
+      setMessageType('error');
+      setFailures([]);
+    });
   };
 
   const restoreWindowVisuals = (identity: WindowIdentity): void => {
-    runOperation(window.spaceToggle.restoreWindowVisuals(identity)).catch((error) =>
-      setMessage(String(error))
-    );
+    runOperation(window.spaceToggle.restoreWindowVisuals(identity)).catch((error) => {
+      setMessage(String(error));
+      setMessageType('error');
+      setFailures([]);
+    });
   };
 
   const addToGroup = async (group: GroupName, identity: WindowIdentity): Promise<void> => {
-    const nextState = await window.spaceToggle.addWindowToGroup(group, identity);
-    setState(nextState);
-    setMessage(`${basename(identity.processPath)} added to ${groupLabel[group]}.`);
+    try {
+      const nextState = await window.spaceToggle.addWindowToGroup(group, identity);
+      setState(nextState);
+      setMessage(`${basename(identity.processPath)} added to ${groupLabel[group]}.`);
+      setMessageType('success');
+      setFailures([]);
+    } catch (error) {
+      setMessage(String(error));
+      setMessageType('error');
+      setFailures([]);
+    }
   };
 
   const removeFromGroup = async (group: GroupName, identity: WindowIdentity): Promise<void> => {
-    const nextState = await window.spaceToggle.removeWindowFromGroup(group, identity);
-    setState(nextState);
-    setMessage(`${basename(identity.processPath)} removed from ${groupLabel[group]}.`);
+    try {
+      const nextState = await window.spaceToggle.removeWindowFromGroup(group, identity);
+      setState(nextState);
+      setMessage(`${basename(identity.processPath)} removed from ${groupLabel[group]}.`);
+      setMessageType('success');
+      setFailures([]);
+    } catch (error) {
+      setMessage(String(error));
+      setMessageType('error');
+      setFailures([]);
+    }
   };
 
   const knownKeys = new Set([
@@ -262,9 +312,23 @@ export const App = (): JSX.Element => {
         </button>
       </section>
 
-      <section className="message-line" aria-live="polite">
-        <ShieldAlert size={16} />
-        <span>{message}</span>
+      <section className={`message-line ${messageType}`} aria-live="polite">
+        <div className="message-content">
+          {messageType === 'success' && <CheckCircle size={16} />}
+          {messageType === 'error' && <AlertCircle size={16} />}
+          {messageType === 'info' && <Info size={16} />}
+          <span>{message}</span>
+        </div>
+        {failures.length > 0 && (
+          <details className="failures-details">
+            <summary>상세 에러 내역 ({failures.length}개)</summary>
+            <ul className="failures-list">
+              {failures.map((fail, i) => (
+                <li key={i}>{fail}</li>
+              ))}
+            </ul>
+          </details>
+        )}
       </section>
 
       <div className="workspace">
