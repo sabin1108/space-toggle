@@ -51,25 +51,50 @@ const uniqueIdentities = (items: WindowIdentity[]): WindowIdentity[] => {
 
 export class WindowManager {
   private readonly activeWindows = new Map<string, NativeWindow>();
+  private cachedWindows: NativeWindow[] = [];
+  private lastFetchTime = 0;
+  private readonly THROTTLE_MS = 500;
 
   constructor(
     private readonly state: StateRepository,
     private readonly win32: Win32Service
   ) {}
 
-  listWindows(): WindowSnapshot[] {
+  private pruneActiveWindows(): void {
+    for (const [id, item] of this.activeWindows.entries()) {
+      if (!this.win32.isWindow(item.hwnd)) {
+        this.activeWindows.delete(id);
+      }
+    }
+  }
+
+  private invalidateCache(): void {
+    this.lastFetchTime = 0;
+  }
+
+  listWindows(force = false): WindowSnapshot[] {
+    const now = Date.now();
+    if (!force && now - this.lastFetchTime < this.THROTTLE_MS && this.cachedWindows.length > 0) {
+      return this.cachedWindows.map((binding) => binding.snapshot);
+    }
+
+    this.pruneActiveWindows();
     const windows = this.win32.listWindows();
     for (const item of windows) {
       this.activeWindows.set(item.snapshot.id, item);
     }
+    this.cachedWindows = windows;
+    this.lastFetchTime = now;
     return windows.map((binding) => binding.snapshot);
   }
 
   addToGroup(group: GroupName, identity: WindowIdentity): AppState {
+    this.invalidateCache();
     return this.state.addToGroup(group, identity);
   }
 
   removeFromGroup(group: GroupName, identity: WindowIdentity): AppState {
+    this.invalidateCache();
     return this.state.removeFromGroup(group, identity);
   }
 
@@ -80,8 +105,11 @@ export class WindowManager {
   }
 
   setMode(mode: Mode): OperationResult {
+    this.invalidateCache();
     const snapshot = this.state.setMode(mode);
     const windows = this.win32.listWindows();
+    this.cachedWindows = windows;
+    this.lastFetchTime = Date.now();
     for (const item of windows) {
       this.activeWindows.set(item.snapshot.id, item);
     }
@@ -134,6 +162,7 @@ export class WindowManager {
   }
 
   excludeFromAltTab(identity: WindowIdentity): OperationResult {
+    this.invalidateCache();
     const window = this.bindOne(identity);
     if (!window) {
       return {
@@ -146,6 +175,7 @@ export class WindowManager {
   }
 
   restoreWindowVisuals(identity: WindowIdentity): OperationResult {
+    this.invalidateCache();
     const window = this.bindOne(identity);
     if (!window) {
       return {
@@ -158,13 +188,17 @@ export class WindowManager {
   }
 
   forceRestore(): OperationResult {
+    this.invalidateCache();
     const snapshot = this.state.setMode('NEUTRAL');
     const identities = uniqueIdentities([
       ...snapshot.groups.work,
       ...snapshot.groups.play,
       ...snapshot.dropZone.capturedWindows
     ]);
-    const windows = this.bindGroup(this.win32.listWindows(), identities);
+    const winList = this.win32.listWindows();
+    this.cachedWindows = winList;
+    this.lastFetchTime = Date.now();
+    const windows = this.bindGroup(winList, identities);
     const failures: string[] = [];
     let changedCount = 0;
 
@@ -203,10 +237,14 @@ export class WindowManager {
     for (const identity of identities) {
       let match = windows.find((window) => matchesIdentity(window.snapshot, identity));
       if (!match) {
-        for (const item of this.activeWindows.values()) {
-          if (this.win32.isWindow(item.hwnd) && matchesIdentity(item.snapshot, identity)) {
-            match = item;
-            break;
+        for (const [id, item] of this.activeWindows.entries()) {
+          if (this.win32.isWindow(item.hwnd)) {
+            if (matchesIdentity(item.snapshot, identity)) {
+              match = item;
+              break;
+            }
+          } else {
+            this.activeWindows.delete(id);
           }
         }
       }
@@ -228,10 +266,14 @@ export class WindowManager {
     }
     let match = windows.find((window) => matchesIdentity(window.snapshot, identity));
     if (!match) {
-      for (const item of this.activeWindows.values()) {
-        if (this.win32.isWindow(item.hwnd) && matchesIdentity(item.snapshot, identity)) {
-          match = item;
-          break;
+      for (const [id, item] of this.activeWindows.entries()) {
+        if (this.win32.isWindow(item.hwnd)) {
+          if (matchesIdentity(item.snapshot, identity)) {
+            match = item;
+            break;
+          }
+        } else {
+          this.activeWindows.delete(id);
         }
       }
     }

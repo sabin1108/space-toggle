@@ -75,15 +75,20 @@ const pointerId = (value: NativeHandle): string => {
   }
 
   if (value && typeof value === 'object') {
-    const existing = pointerObjectIds.get(value);
-    if (existing) {
-      return existing;
-    }
+    try {
+      const addr = koffi.address(value);
+      return `0x${addr.toString(16)}`;
+    } catch {
+      const existing = pointerObjectIds.get(value);
+      if (existing) {
+        return existing;
+      }
 
-    pointerObjectCounter += 1;
-    const generated = `hwnd-${pointerObjectCounter}`;
-    pointerObjectIds.set(value, generated);
-    return generated;
+      pointerObjectCounter += 1;
+      const generated = `hwnd-${pointerObjectCounter}`;
+      pointerObjectIds.set(value, generated);
+      return generated;
+    }
   }
 
   return 'hwnd-unknown';
