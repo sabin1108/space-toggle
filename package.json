@@ -12,6 +12,7 @@
     "build": "npm run typecheck && electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "verify:win32": "node scripts/verify-win32-poc.cjs",
+    "test:qa": "node scripts/verify-qa.cjs",
     "preview": "electron-vite preview",
     "dist": "npm run build && electron-builder"
   },
