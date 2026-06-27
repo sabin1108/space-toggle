@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Notification } from 'electron';
+import { app, BrowserWindow, Notification, screen } from 'electron';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { HotkeyController } from './hotkeys';
@@ -9,6 +9,7 @@ import { createWin32Service } from './win32';
 import { WindowManager } from './window-manager';
 
 let mainWindow: BrowserWindow | null = null;
+let dropZoneWindow: BrowserWindow | null = null;
 let stateRepository: StateRepository | null = null;
 let hotkeys: HotkeyController | null = null;
 
@@ -63,6 +64,58 @@ const createMainWindow = (): BrowserWindow => {
   return window;
 };
 
+const createDropZoneWindow = (stateRepo: StateRepository): BrowserWindow => {
+  log('Creating drop zone window');
+  const state = stateRepo.get();
+  const dz = state.dropZone;
+  const window = new BrowserWindow({
+    x: dz.x,
+    y: dz.y,
+    width: dz.width,
+    height: dz.height,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    hasShadow: false,
+    resizable: false,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: join(__dirname, '../preload/index.js')
+    }
+  });
+
+  window.setIgnoreMouseEvents(true, { forward: true });
+
+  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
+    window.loadURL(`${process.env.ELECTRON_RENDERER_URL}#dropzone`);
+  } else {
+    const rendererPath = join(__dirname, '../renderer/index.html');
+    window.loadFile(rendererPath, { hash: 'dropzone' });
+  }
+
+  window.once('ready-to-show', () => {
+    window.show();
+  });
+
+  return window;
+};
+
+const syncDropZoneBounds = (window: BrowserWindow, stateRepo: StateRepository) => {
+  const state = stateRepo.get();
+  const dz = state.dropZone;
+  window.setBounds({
+    x: dz.x,
+    y: dz.y,
+    width: dz.width,
+    height: dz.height
+  });
+};
+
+
 const singleInstanceLock = app.requestSingleInstanceLock();
 
 if (!singleInstanceLock) {
@@ -94,6 +147,29 @@ if (!singleInstanceLock) {
     const recoveryResult = windowManager.recoverAfterCrashIfNeeded();
 
     mainWindow = createMainWindow();
+    dropZoneWindow = createDropZoneWindow(stateRepository);
+
+    screen.on('display-metrics-changed', () => {
+      if (dropZoneWindow && !dropZoneWindow.isDestroyed() && stateRepository) {
+        log('Display metrics changed, syncing drop zone bounds');
+        syncDropZoneBounds(dropZoneWindow, stateRepository);
+      }
+    });
+
+    screen.on('display-added', () => {
+      if (dropZoneWindow && !dropZoneWindow.isDestroyed() && stateRepository) {
+        log('Display added, syncing drop zone bounds');
+        syncDropZoneBounds(dropZoneWindow, stateRepository);
+      }
+    });
+
+    screen.on('display-removed', () => {
+      if (dropZoneWindow && !dropZoneWindow.isDestroyed() && stateRepository) {
+        log('Display removed, syncing drop zone bounds');
+        syncDropZoneBounds(dropZoneWindow, stateRepository);
+      }
+    });
+
     hotkeys = new HotkeyController(windowManager, stateRepository);
     const hotkeyStatus = hotkeys.register(stateRepository.get().customHotkey);
     log(`Hotkey registered: ${hotkeyStatus.registered}`);

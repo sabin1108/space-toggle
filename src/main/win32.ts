@@ -23,6 +23,14 @@ export interface Win32Service {
   hideWindow(hwnd: NativeHandle): OperationResult;
   excludeFromAltTab(hwnd: NativeHandle): OperationResult;
   restoreWindowVisuals(hwnd: NativeHandle): OperationResult;
+  getForegroundWindow(): NativeHandle;
+  isLButtonDown(): boolean;
+  isOwnWindow(hwnd: NativeHandle): boolean;
+  getWindowRect(hwnd: NativeHandle): WindowRect | null;
+  setWindowTransparency(hwnd: NativeHandle, alpha: number): OperationResult;
+  setWindowRect(hwnd: NativeHandle, rect: WindowRect): OperationResult;
+  getWindowSnapshot(hwnd: NativeHandle): WindowSnapshot | null;
+  getWindowExStyle(hwnd: NativeHandle): number;
 }
 
 const SW_HIDE = 0;
@@ -31,6 +39,7 @@ const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
 const GWL_EXSTYLE = -20;
 const WS_EX_TOOLWINDOW = 0x00000080;
 const WS_EX_APPWINDOW = 0x00040000;
+const WS_EX_LAYERED = 0x00080000;
 const LWA_ALPHA = 0x00000002;
 const SWP_NOSIZE = 0x0001;
 const SWP_NOMOVE = 0x0002;
@@ -132,6 +141,38 @@ class DisabledWin32Service implements Win32Service {
   restoreWindowVisuals(): OperationResult {
     return { ok: false, message: 'Win32 APIs are unavailable on this platform.' };
   }
+
+  getForegroundWindow(): NativeHandle {
+    return null;
+  }
+
+  isLButtonDown(): boolean {
+    return false;
+  }
+
+  isOwnWindow(): boolean {
+    return false;
+  }
+
+  getWindowRect(): WindowRect | null {
+    return null;
+  }
+
+  setWindowTransparency(): OperationResult {
+    return { ok: false, message: 'Win32 APIs are unavailable on this platform.' };
+  }
+
+  setWindowRect(): OperationResult {
+    return { ok: false, message: 'Win32 APIs are unavailable on this platform.' };
+  }
+
+  getWindowSnapshot(): WindowSnapshot | null {
+    return null;
+  }
+
+  getWindowExStyle(): number {
+    return 0;
+  }
 }
 
 class KoffiWin32Service implements Win32Service {
@@ -193,6 +234,8 @@ class KoffiWin32Service implements Win32Service {
     'bool __stdcall QueryFullProcessImageNameW(void *hProcess, uint32 dwFlags, void *lpExeName, _Inout_ uint32 *lpdwSize)'
   );
   private readonly CloseHandle = this.kernel32.func('bool __stdcall CloseHandle(void *hObject)');
+  private readonly GetForegroundWindow = this.user32.func('void * __stdcall GetForegroundWindow()');
+  private readonly GetAsyncKeyState = this.user32.func('int16 __stdcall GetAsyncKeyState(int vKey)');
 
   listWindows(): NativeWindowBinding[] {
     const bindings: NativeWindowBinding[] = [];
@@ -274,6 +317,14 @@ class KoffiWin32Service implements Win32Service {
     return Boolean(this.IsWindow(hwnd));
   }
 
+  getForegroundWindow(): NativeHandle {
+    return this.GetForegroundWindow();
+  }
+
+  isLButtonDown(): boolean {
+    return (numeric(this.GetAsyncKeyState(0x01)) & 0x8000) !== 0;
+  }
+
   showWindow(hwnd: NativeHandle): OperationResult {
     return this.callShowWindow(hwnd, SW_SHOW, 'shown');
   }
@@ -307,7 +358,7 @@ class KoffiWin32Service implements Win32Service {
 
     const style = numeric(this.GetWindowLongPtrW(hwnd, GWL_EXSTYLE));
     if (style !== 0) {
-      this.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (style & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW);
+      this.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (style & ~WS_EX_TOOLWINDOW & ~WS_EX_LAYERED) | WS_EX_APPWINDOW);
     }
 
     this.SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
@@ -406,6 +457,89 @@ class KoffiWin32Service implements Win32Service {
     } finally {
       this.CloseHandle(processHandle);
     }
+  }
+
+  isOwnWindow(hwnd: NativeHandle): boolean {
+    if (!this.isWindow(hwnd)) {
+      return false;
+    }
+    const pidRef = [0];
+    this.GetWindowThreadProcessId(hwnd, pidRef);
+    return pidRef[0] === process.pid;
+  }
+
+  getWindowRect(hwnd: NativeHandle): WindowRect | null {
+    return this.getRect(hwnd);
+  }
+
+  setWindowTransparency(hwnd: NativeHandle, alpha: number): OperationResult {
+    if (!this.isWindow(hwnd)) {
+      return { ok: false, message: 'Window handle is no longer valid.' };
+    }
+
+    const style = numeric(this.GetWindowLongPtrW(hwnd, GWL_EXSTYLE));
+    const nextStyle = style | WS_EX_LAYERED;
+    this.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, nextStyle);
+    const ok = Boolean(this.SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA));
+    this.refreshWindowFrame(hwnd);
+
+    return {
+      ok,
+      message: ok ? 'Window transparency applied.' : 'SetLayeredWindowAttributes failed.'
+    };
+  }
+
+  setWindowRect(hwnd: NativeHandle, rect: WindowRect): OperationResult {
+    if (!this.isWindow(hwnd)) {
+      return { ok: false, message: 'Window handle is no longer valid.' };
+    }
+
+    const ok = Boolean(
+      this.SetWindowPos(
+        hwnd,
+        null,
+        rect.x,
+        rect.y,
+        rect.width,
+        rect.height,
+        SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED
+      )
+    );
+
+    return {
+      ok,
+      message: ok ? 'Window rect set successfully.' : 'SetWindowPos failed.'
+    };
+  }
+
+  getWindowSnapshot(hwnd: NativeHandle): WindowSnapshot | null {
+    if (!this.isWindow(hwnd)) {
+      return null;
+    }
+    const title = this.getWindowTitle(hwnd) || 'Untitled';
+    const processPath = this.getProcessPath(hwnd) || '';
+    const className = this.getClassName(hwnd);
+    const rect = this.getRect(hwnd);
+    return {
+      id: pointerId(hwnd),
+      title,
+      processPath,
+      className,
+      rect,
+      isVisible: this.isVisible(hwnd),
+      identity: {
+        processPath,
+        titlePattern: title,
+        className
+      }
+    };
+  }
+
+  getWindowExStyle(hwnd: NativeHandle): number {
+    if (!this.isWindow(hwnd)) {
+      return 0;
+    }
+    return numeric(this.GetWindowLongPtrW(hwnd, GWL_EXSTYLE));
   }
 }
 

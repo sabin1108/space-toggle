@@ -59,6 +59,28 @@ const emptyState: AppState = {
 };
 
 export const App = (): JSX.Element => {
+  const [hash, setHash] = useState(window.location.hash);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setHash(window.location.hash);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (hash === '#dropzone') {
+      document.documentElement.style.background = 'transparent';
+      document.body.style.background = 'transparent';
+      document.body.style.minWidth = '0';
+    }
+  }, [hash]);
+
+  if (hash === '#dropzone') {
+    return <DropZoneOverlay />;
+  }
+
   const [state, setState] = useState<AppState>(emptyState);
   const [windows, setWindows] = useState<WindowSnapshot[]>([]);
   const [hotkey, setHotkey] = useState<HotkeyStatus | null>(null);
@@ -427,3 +449,36 @@ const GroupPanel = ({ group, items, onRemove }: GroupPanelProps): JSX.Element =>
     </div>
   </div>
 );
+
+const DropZoneOverlay = (): JSX.Element => {
+  const [state, setState] = useState<AppState>(emptyState);
+
+  useEffect(() => {
+    const refreshState = async () => {
+      try {
+        const nextState = await window.spaceToggle.getState();
+        setState(nextState);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    refreshState();
+    const interval = setInterval(refreshState, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const count = state.dropZone?.capturedWindows?.length || 0;
+
+  return (
+    <div className="dropzone-overlay">
+      <div className="dropzone-border">
+        <div className="dropzone-content">
+          <MonitorUp size={32} className="dropzone-icon" />
+          <h2>Drop Zone</h2>
+          <p className="dropzone-count">{count} window(s) captured</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+

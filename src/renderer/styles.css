@@ -421,3 +421,52 @@ h2 {
   border-color: #a4ad96;
 }
 
+/* Drop Zone Overlay Styles */
+.dropzone-overlay {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.dropzone-border {
+  flex: 1;
+  border: 3px dashed #7c8b60;
+  border-radius: 12px;
+  background: rgba(124, 139, 96, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #24301d;
+  text-align: center;
+  font-family: inherit;
+}
+
+.dropzone-icon {
+  color: #7c8b60;
+  margin-bottom: 8px;
+}
+
+.dropzone-overlay h2 {
+  font-size: 20px;
+  margin: 0 0 6px 0;
+  font-weight: 700;
+}
+
+.dropzone-count {
+  margin: 0;
+  font-size: 13px;
+  color: #555c4e;
+  font-weight: 600;
+}
+
+

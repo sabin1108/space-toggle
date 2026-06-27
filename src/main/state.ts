@@ -1,5 +1,5 @@
 import Store from 'electron-store';
-import type { AppState, GroupName, Mode, WindowIdentity } from '../shared/types';
+import type { AppState, GroupName, Mode, WindowIdentity, ModifiedWindowRecord } from '../shared/types';
 
 const SCHEMA_VERSION = 1;
 
@@ -15,9 +15,10 @@ const defaultState: AppState = {
     y: 80,
     width: 480,
     height: 270,
-    isTransparentMode: false,
+    isTransparentMode: true, // Default to true as transparent overlay PoC
     capturedWindows: []
   },
+  modifiedWindows: [],
   lastCleanShutdown: true
 };
 
@@ -89,6 +90,43 @@ export class StateRepository {
   setCustomHotkey(hotkey: string): AppState {
     const next = this.get();
     next.customHotkey = hotkey;
+    return this.replace(next);
+  }
+
+  addModifiedWindow(record: ModifiedWindowRecord): AppState {
+    const next = this.get();
+    const targetKey = identityKey(record.identity);
+    next.modifiedWindows = next.modifiedWindows.filter((r) => identityKey(r.identity) !== targetKey);
+    next.modifiedWindows.push(record);
+    return this.replace(next);
+  }
+
+  removeModifiedWindow(identity: WindowIdentity): AppState {
+    const next = this.get();
+    const targetKey = identityKey(identity);
+    next.modifiedWindows = next.modifiedWindows.filter((r) => identityKey(r.identity) !== targetKey);
+    return this.replace(next);
+  }
+
+  clearModifiedWindows(): AppState {
+    const next = this.get();
+    next.modifiedWindows = [];
+    return this.replace(next);
+  }
+
+  addWindowToDropZone(identity: WindowIdentity): AppState {
+    const next = this.get();
+    const targetKey = identityKey(identity);
+    if (!next.dropZone.capturedWindows.some((w) => identityKey(w) === targetKey)) {
+      next.dropZone.capturedWindows.push(identity);
+    }
+    return this.replace(next);
+  }
+
+  removeWindowFromDropZone(identity: WindowIdentity): AppState {
+    const next = this.get();
+    const targetKey = identityKey(identity);
+    next.dropZone.capturedWindows = next.dropZone.capturedWindows.filter((w) => identityKey(w) !== targetKey);
     return this.replace(next);
   }
 }

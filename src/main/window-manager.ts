@@ -4,7 +4,8 @@ import type {
   Mode,
   OperationResult,
   WindowIdentity,
-  WindowSnapshot
+  WindowSnapshot,
+  ModifiedWindowRecord
 } from '../shared/types';
 import type { StateRepository } from './state';
 import type { Win32Service } from './win32';
@@ -55,10 +56,132 @@ export class WindowManager {
   private lastFetchTime = 0;
   private readonly THROTTLE_MS = 500;
 
+  private dragPollInterval: NodeJS.Timeout | null = null;
+  private isDragging = false;
+
   constructor(
     private readonly state: StateRepository,
     private readonly win32: Win32Service
-  ) {}
+  ) {
+    this.startDragPolling();
+  }
+
+  private startDragPolling(): void {
+    if (!this.win32.isAvailable) {
+      return;
+    }
+    this.dragPollInterval = setInterval(() => {
+      try {
+        const isDown = this.win32.isLButtonDown();
+        if (isDown) {
+          this.isDragging = true;
+        } else if (this.isDragging) {
+          this.isDragging = false;
+          this.handleDragRelease();
+        }
+      } catch (err) {
+        console.error('Error in drag polling:', err);
+      }
+    }, 250);
+  }
+
+  private handleDragRelease(): void {
+    const hwnd = this.win32.getForegroundWindow();
+    if (!hwnd || !this.win32.isWindow(hwnd)) {
+      return;
+    }
+    if (this.win32.isOwnWindow(hwnd)) {
+      return;
+    }
+
+    const rect = this.win32.getWindowRect(hwnd);
+    if (!rect) {
+      return;
+    }
+
+    const state = this.state.get();
+    const dz = state.dropZone;
+
+    if (this.intersects(rect, dz)) {
+      this.captureWindowToDropZone(hwnd);
+    }
+  }
+
+  private intersects(
+    rect1: { x: number; y: number; width: number; height: number },
+    rect2: { x: number; y: number; width: number; height: number }
+  ): boolean {
+    return (
+      rect1.x < rect2.x + rect2.width &&
+      rect1.x + rect1.width > rect2.x &&
+      rect1.y < rect2.y + rect2.height &&
+      rect1.y + rect1.height > rect2.y
+    );
+  }
+
+  private isChromeOrEdge(processPath: string): boolean {
+    const normalized = processPath.toLowerCase();
+    return normalized.endsWith('chrome.exe') || normalized.endsWith('msedge.exe');
+  }
+
+  private captureWindowToDropZone(hwnd: unknown): void {
+    if (!this.win32.isWindow(hwnd)) {
+      return;
+    }
+
+    const snapshot = this.win32.getWindowSnapshot(hwnd);
+    if (!snapshot) {
+      return;
+    }
+
+    const state = this.state.get();
+    const dz = state.dropZone;
+
+    const targetKey = [
+      snapshot.processPath,
+      snapshot.title,
+      snapshot.className ?? ''
+    ].map(normalize).join('|');
+
+    const isAlreadyCaptured = dz.capturedWindows.some((w) => {
+      return [
+        w.processPath,
+        w.titlePattern,
+        w.className ?? ''
+      ].map(normalize).join('|') === targetKey;
+    });
+
+    if (isAlreadyCaptured) {
+      return;
+    }
+
+    const originalRect = this.win32.getWindowRect(hwnd);
+    const originalExStyle = this.win32.getWindowExStyle(hwnd);
+
+    this.state.addWindowToDropZone(snapshot.identity);
+
+    const isBrowser = this.isChromeOrEdge(snapshot.processPath);
+    const useOffscreen = !dz.isTransparentMode || isBrowser;
+    const type = useOffscreen ? 'OFFSCREEN' : 'TRANSPARENT';
+
+    this.state.addModifiedWindow({
+      identity: snapshot.identity,
+      originalRect,
+      originalExStyle,
+      type
+    });
+
+    if (type === 'TRANSPARENT') {
+      this.win32.setWindowTransparency(hwnd, 128);
+    } else {
+      const width = originalRect ? originalRect.width : 800;
+      const height = originalRect ? originalRect.height : 600;
+      this.win32.setWindowRect(hwnd, { x: -32000, y: -32000, width, height });
+      this.win32.excludeFromAltTab(hwnd);
+    }
+
+    console.log(`[DropZone] Successfully captured window "${snapshot.title}" as ${type}.`);
+  }
 
   private pruneActiveWindows(): void {
     for (const [id, item] of this.activeWindows.entries()) {
@@ -177,31 +300,75 @@ export class WindowManager {
   restoreWindowVisuals(identity: WindowIdentity): OperationResult {
     this.invalidateCache();
     const window = this.bindOne(identity);
+
+    const state = this.state.get();
+    const key = (id: WindowIdentity) =>
+      `${id.processPath.toLowerCase()}|${id.titlePattern.toLowerCase()}|${(id.className || '').toLowerCase()}`;
+    const targetKey = key(identity);
+    const record = state.modifiedWindows.find((r) => key(r.identity) === targetKey);
+
+    if (record) {
+      this.state.removeModifiedWindow(identity);
+      this.state.removeWindowFromDropZone(identity);
+    }
+
     if (!window) {
       return {
-        ok: false,
-        message: `No current window match for ${identityLabel(identity)}.`
+        ok: record !== undefined,
+        message: record
+          ? 'Window was removed from drop zone tracking, but live window not found.'
+          : `No current window match for ${identityLabel(identity)}.`
       };
     }
 
-    return this.win32.restoreWindowVisuals(window.hwnd);
+    const res = this.win32.restoreWindowVisuals(window.hwnd);
+    if (record && record.type === 'OFFSCREEN' && record.originalRect) {
+      this.win32.setWindowRect(window.hwnd, record.originalRect);
+    }
+
+    return res;
   }
 
   forceRestore(): OperationResult {
     this.invalidateCache();
     const snapshot = this.state.setMode('NEUTRAL');
-    const identities = uniqueIdentities([
-      ...snapshot.groups.work,
-      ...snapshot.groups.play,
-      ...snapshot.dropZone.capturedWindows
-    ]);
+
     const winList = this.win32.listWindows();
     this.cachedWindows = winList;
     this.lastFetchTime = Date.now();
-    const windows = this.bindGroup(winList, identities);
+
     const failures: string[] = [];
     let changedCount = 0;
 
+    // 1. Restore all tracked modified windows
+    for (const record of snapshot.modifiedWindows) {
+      const window = this.bindOne(record.identity);
+      if (window) {
+        const res = this.win32.restoreWindowVisuals(window.hwnd);
+        if (record.type === 'OFFSCREEN' && record.originalRect) {
+          this.win32.setWindowRect(window.hwnd, record.originalRect);
+        }
+        if (res.ok) {
+          changedCount += 1;
+        } else {
+          failures.push(`${window.snapshot.title}: ${res.message}`);
+        }
+      }
+    }
+
+    // 2. Clear state lists
+    this.state.clearModifiedWindows();
+    const nextState = this.state.get();
+    for (const dzWin of [...nextState.dropZone.capturedWindows]) {
+      this.state.removeWindowFromDropZone(dzWin);
+    }
+
+    // 3. Restore all work/play windows
+    const identities = uniqueIdentities([
+      ...snapshot.groups.work,
+      ...snapshot.groups.play
+    ]);
+    const windows = this.bindGroup(winList, identities);
     for (const window of windows) {
       const result = this.win32.restoreWindowVisuals(window.hwnd);
       if (result.ok) {

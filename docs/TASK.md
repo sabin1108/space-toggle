@@ -6,15 +6,15 @@
 - [x] Issue #8: Win32 Drag/Drop Detection & Rectangle Intersection
   - [x] win32.ts: Add GetForegroundWindow and GetAsyncKeyState bindings
   - [x] window-manager.ts: Run periodic drag-and-drop checks (250ms polling loop)
-- [/] Issue #9: Opacity Control & Chrome/Edge Fallback Mode
-  - [/] win32.ts: Add setWindowTransparency function
-  - [/] state.ts: Add captured/modified windows schema to state
-  - [/] window-manager.ts: Apply opacity style to intersected windows
-  - [/] window-manager.ts: Implement off-screen fallback (-32000, -32000) for Chrome/Edge
-- [ ] Issue #10: System Tray Restore & Crash Recovery Hardening
-  - [ ] index.ts: Persist state changes immediately
-  - [ ] tray.ts: Add "Force Restore All" to system tray menu
-  - [ ] window-manager.ts: Auto-restore on startup if lastCleanShutdown is false
-- [ ] Verification and automated tests
-  - [ ] verify-qa.cjs: Update QA integration tests for Drop Zone & Recovery
-  - [ ] Run test:qa script to ensure everything passes
+- [x] Issue #9: Opacity Control & Chrome/Edge Fallback Mode
+  - [x] win32.ts: Add setWindowTransparency function
+  - [x] state.ts: Add captured/modified windows schema to state
+  - [x] window-manager.ts: Apply opacity style to intersected windows
+  - [x] window-manager.ts: Implement off-screen fallback (-32000, -32000) for Chrome/Edge
+- [x] Issue #10: System Tray Restore & Crash Recovery Hardening
+  - [x] index.ts: Persist state changes immediately
+  - [x] tray.ts: Add "Force Restore All" to system tray menu
+  - [x] window-manager.ts: Auto-restore on startup if lastCleanShutdown is false
+- [x] Verification and automated tests
+  - [x] verify-qa.cjs: Update QA integration tests for Drop Zone & Recovery
+  - [x] Run test:qa script to ensure everything passes

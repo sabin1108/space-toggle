@@ -207,9 +207,10 @@ class MockStateRepository {
         y: 80,
         width: 480,
         height: 270,
-        isTransparentMode: false,
+        isTransparentMode: true,
         capturedWindows: []
       },
+      modifiedWindows: [],
       lastCleanShutdown: true
     };
   }
@@ -236,6 +237,35 @@ class MockStateRepository {
   removeFromGroup(group, identity) {
     this.state.groups[group] = this.state.groups[group].filter(
       (i) => i.processPath !== identity.processPath
+    );
+    return this.get();
+  }
+
+  addModifiedWindow(record) {
+    this.state.modifiedWindows.push(record);
+    return this.get();
+  }
+
+  removeModifiedWindow(identity) {
+    this.state.modifiedWindows = this.state.modifiedWindows.filter(
+      (r) => r.identity.processPath !== identity.processPath
+    );
+    return this.get();
+  }
+
+  clearModifiedWindows() {
+    this.state.modifiedWindows = [];
+    return this.get();
+  }
+
+  addWindowToDropZone(identity) {
+    this.state.dropZone.capturedWindows.push(identity);
+    return this.get();
+  }
+
+  removeWindowFromDropZone(identity) {
+    this.state.dropZone.capturedWindows = this.state.dropZone.capturedWindows.filter(
+      (w) => w.processPath !== identity.processPath
     );
     return this.get();
   }
@@ -289,6 +319,61 @@ class MockWin32Service {
     const win = this.windows.find(w => w.hwnd === hwnd);
     if (win) win.isVisible = true;
     return { ok: true, message: 'restored' };
+  }
+
+  getForegroundWindow() {
+    this.calls.push('getForegroundWindow');
+    return this.windows[0] ? this.windows[0].hwnd : null;
+  }
+
+  isLButtonDown() {
+    this.calls.push('isLButtonDown');
+    return false;
+  }
+
+  isOwnWindow(hwnd) {
+    this.calls.push(`isOwnWindow(${hwnd})`);
+    return false;
+  }
+
+  getWindowRect(hwnd) {
+    this.calls.push(`getWindowRect(${hwnd})`);
+    const win = this.windows.find(w => w.hwnd === hwnd);
+    return win ? { x: 10, y: 10, width: 100, height: 100 } : null;
+  }
+
+  setWindowTransparency(hwnd, alpha) {
+    this.calls.push(`setWindowTransparency(${hwnd}, ${alpha})`);
+    return { ok: true, message: 'transparent' };
+  }
+
+  setWindowRect(hwnd, rect) {
+    this.calls.push(`setWindowRect(${hwnd}, ${JSON.stringify(rect)})`);
+    return { ok: true, message: 'rect set' };
+  }
+
+  getWindowSnapshot(hwnd) {
+    this.calls.push(`getWindowSnapshot(${hwnd})`);
+    const w = this.windows.find(win => win.hwnd === hwnd);
+    if (!w) return null;
+    return {
+      id: w.id,
+      title: w.title,
+      processPath: w.processPath,
+      className: w.className,
+      rect: { x: 10, y: 10, width: 100, height: 100 },
+      isVisible: w.isVisible,
+      identity: {
+        processPath: w.processPath,
+        titlePattern: w.title,
+        className: w.className
+      }
+    };
+  }
+
+  getWindowExStyle(hwnd) {
+    this.calls.push(`getWindowExStyle(${hwnd})`);
+    return 0;
   }
 }
 
@@ -437,6 +522,53 @@ class MockWin32Service {
   assert.ok(res.ok);
   assert.ok(win32.calls.includes('restoreWindowVisuals(hwnd-work)'));
   console.log('Scenario F PASS: Crash recovery triggers visual restore successfully.');
+}
+
+// Scenario G: Drop Zone Capture & Hardened Recovery
+{
+  const state = new MockStateRepository();
+  const win32 = new MockWin32Service();
+  const manager = new WindowManager(state, win32);
+
+  // Set up mock window to drag
+  win32.windows = [
+    { hwnd: 'hwnd-test', id: '0x5', title: 'Target App', processPath: 'C:\\target.exe', className: 'TargetClass', isVisible: true }
+  ];
+
+  // Configure dropZone at coordinates (80, 80, 480, 270)
+  // Mock mouse release: isDragging was true, isLButtonDown becomes false
+  manager.isDragging = true;
+  // Trigger polling tick by simulating handleDragRelease:
+  // Set window rect to intersect Drop Zone (e.g. x: 100, y: 100, width: 200, height: 200)
+  win32.getWindowRect = (hwnd) => ({ x: 100, y: 100, width: 200, height: 200 });
+
+  manager.handleDragRelease();
+
+  // Verify it was captured into dropZone.capturedWindows
+  const activeState = state.get();
+  assert.strictEqual(activeState.dropZone.capturedWindows.length, 1);
+  assert.strictEqual(activeState.dropZone.capturedWindows[0].processPath, 'C:\\target.exe');
+
+  // Verify it was marked as a modified window
+  assert.strictEqual(activeState.modifiedWindows.length, 1);
+  assert.strictEqual(activeState.modifiedWindows[0].type, 'TRANSPARENT'); // defaults to transparent since isTransparentMode is true
+
+  // Verify transparency Win32 call was made
+  assert.ok(win32.calls.includes('setWindowTransparency(hwnd-test, 128)'));
+
+  // Test crash recovery: when app starts and lastCleanShutdown is false
+  state.state.lastCleanShutdown = false;
+  // Clear calls
+  win32.calls = [];
+  const recoveryRes = manager.recoverAfterCrashIfNeeded();
+  assert.ok(recoveryRes);
+  assert.ok(recoveryRes.ok);
+
+  // Verify it restored styles and original transparency
+  assert.ok(win32.calls.includes('restoreWindowVisuals(hwnd-test)'));
+  assert.strictEqual(state.get().modifiedWindows.length, 0);
+
+  console.log('Scenario G PASS: Drop Zone drag capture and recovery behave correctly.');
 }
 
 console.log('Phase 2 PASS: All WindowManager logic mocks passed.');

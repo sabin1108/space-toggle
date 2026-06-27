@@ -30,8 +30,15 @@ export interface DropZoneState {
   y: number;
   width: number;
   height: number;
-  isTransparentMode: boolean;
+  isTransparentMode: boolean; // if true, captured windows become transparent. If false, off-screen fallback.
   capturedWindows: WindowIdentity[];
+}
+
+export interface ModifiedWindowRecord {
+  identity: WindowIdentity;
+  originalRect: WindowRect | null;
+  originalExStyle: number;
+  type: 'TRANSPARENT' | 'OFFSCREEN' | 'HIDDEN';
 }
 
 export interface AppState {
@@ -42,6 +49,7 @@ export interface AppState {
     play: WindowIdentity[];
   };
   dropZone: DropZoneState;
+  modifiedWindows: ModifiedWindowRecord[];
   lastCleanShutdown: boolean;
   customHotkey?: string;
 }
