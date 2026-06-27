@@ -1,17 +1,17 @@
-- [x] Issue #7: Drop Zone Transparent Overlay Window (Visual Shell)
+- [x] 이슈 #9: Drop Zone Transparent Overlay Window (Visual Shell)
   - [x] App.tsx: Add checking for location hash `#dropzone`
   - [x] styles.css: Add styling for Drop Zone overlay
   - [x] index.ts: Spawn and reposition secondary BrowserWindow `dropZoneWindow`
   - [x] index.ts: Coordinate screen scaling and DPI changes
-- [x] Issue #8: Win32 Drag/Drop Detection & Rectangle Intersection
+- [x] 이슈 #10: Win32 Drag/Drop Detection & Rectangle Intersection
   - [x] win32.ts: Add GetForegroundWindow and GetAsyncKeyState bindings
   - [x] window-manager.ts: Run periodic drag-and-drop checks (250ms polling loop)
-- [x] Issue #9: Opacity Control & Chrome/Edge Fallback Mode
+- [x] 이슈 #11: Opacity Control & Chrome/Edge Fallback Mode
   - [x] win32.ts: Add setWindowTransparency function
   - [x] state.ts: Add captured/modified windows schema to state
   - [x] window-manager.ts: Apply opacity style to intersected windows
   - [x] window-manager.ts: Implement off-screen fallback (-32000, -32000) for Chrome/Edge
-- [x] Issue #10: System Tray Restore & Crash Recovery Hardening
+- [x] 이슈 #12: System Tray Restore & Crash Recovery Hardening
   - [x] index.ts: Persist state changes immediately
   - [x] tray.ts: Add "Force Restore All" to system tray menu
   - [x] window-manager.ts: Auto-restore on startup if lastCleanShutdown is false
