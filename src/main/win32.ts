@@ -376,10 +376,10 @@ class KoffiWin32Service implements Win32Service {
       return { ok: false, message: 'Window handle is no longer valid.' };
     }
 
-    const ok = Boolean(this.ShowWindow(hwnd, command));
+    this.ShowWindow(hwnd, command);
     return {
-      ok,
-      message: ok ? `Window ${verb}.` : `ShowWindow did not report success while ${verb}.`
+      ok: true,
+      message: `Window ${verb}.`
     };
   }
 

@@ -55,6 +55,7 @@ const emptyState: AppState = {
     isTransparentMode: false,
     capturedWindows: []
   },
+  modifiedWindows: [],
   lastCleanShutdown: true
 };
 

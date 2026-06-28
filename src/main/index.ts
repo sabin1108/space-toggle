@@ -12,6 +12,7 @@ let mainWindow: BrowserWindow | null = null;
 let dropZoneWindow: BrowserWindow | null = null;
 let stateRepository: StateRepository | null = null;
 let hotkeys: HotkeyController | null = null;
+let isQuitting = false;
 
 const logPath = join(app.getPath('userData'), 'spacetoggle-main.log');
 
@@ -60,6 +61,13 @@ const createMainWindow = (): BrowserWindow => {
     log(`Loading packaged renderer: ${rendererPath}`);
     window.loadFile(rendererPath);
   }
+
+  window.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      window.hide();
+    }
+  });
 
   return window;
 };
@@ -205,6 +213,7 @@ if (!singleInstanceLock) {
 
 app.on('before-quit', () => {
   log('Before quit');
+  isQuitting = true;
   hotkeys?.unregisterAll();
   stateRepository?.markCleanShutdown();
 });
