@@ -195,20 +195,53 @@ export class WindowManager {
     this.lastFetchTime = 0;
   }
 
-  listWindows(force = false): WindowSnapshot[] {
+  async listWindows(force = false): Promise<WindowSnapshot[]> {
     const now = Date.now();
+    let snapshots: WindowSnapshot[];
+
     if (!force && now - this.lastFetchTime < this.THROTTLE_MS && this.cachedWindows.length > 0) {
-      return this.cachedWindows.map((binding) => binding.snapshot);
+      snapshots = this.cachedWindows.map((binding) => binding.snapshot);
+    } else {
+      this.pruneActiveWindows();
+      const windows = this.win32.listWindows();
+      for (const item of windows) {
+        this.activeWindows.set(item.snapshot.id, item);
+      }
+      this.cachedWindows = windows;
+      this.lastFetchTime = now;
+      snapshots = windows.map((binding) => binding.snapshot);
     }
 
-    this.pruneActiveWindows();
-    const windows = this.win32.listWindows();
-    for (const item of windows) {
-      this.activeWindows.set(item.snapshot.id, item);
+    try {
+      const { desktopCapturer } = require('electron');
+      const sources = await desktopCapturer.getSources({
+        types: ['window'],
+        thumbnailSize: { width: 160, height: 100 }
+      });
+
+      const thumbnailMap = new Map<string, string>();
+      for (const src of sources) {
+        const parts = src.id.split(':');
+        if (parts[0] === 'window' && parts[1]) {
+          const hwndDec = parseInt(parts[1], 10);
+          if (!isNaN(hwndDec)) {
+            const hexId = `0x${hwndDec.toString(16).toLowerCase()}`;
+            thumbnailMap.set(hexId, src.thumbnail.toDataURL());
+          }
+        }
+      }
+
+      for (const snapshot of snapshots) {
+        const idLower = snapshot.id.toLowerCase();
+        if (thumbnailMap.has(idLower)) {
+          snapshot.thumbnail = thumbnailMap.get(idLower);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to capture thumbnails:', err);
     }
-    this.cachedWindows = windows;
-    this.lastFetchTime = now;
-    return windows.map((binding) => binding.snapshot);
+
+    return snapshots;
   }
 
   addToGroup(group: GroupName, identity: WindowIdentity): AppState {

@@ -91,6 +91,40 @@ export const App = (): JSX.Element => {
   const [query, setQuery] = useState('');
   const [isEditingHotkey, setIsEditingHotkey] = useState(false);
   const [recordedKeys, setRecordedKeys] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = (id: string): void => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const addSelectedToGroup = async (group: GroupName): Promise<void> => {
+    const targets = windows.filter((w) => selectedIds.has(w.id));
+    if (targets.length === 0) return;
+
+    try {
+      let lastState = state;
+      for (const item of targets) {
+        lastState = await window.spaceToggle.addWindowToGroup(group, item.identity);
+      }
+      setState(lastState);
+      setMessage(`${targets.length}개의 창이 ${groupLabel[group]}에 등록되었습니다.`);
+      setMessageType('success');
+      setFailures([]);
+      setSelectedIds(new Set());
+    } catch (error) {
+      setMessage(String(error));
+      setMessageType('error');
+      setFailures([]);
+    }
+  };
 
   const startHotkeyEditing = (): void => {
     setRecordedKeys(hotkey?.accelerator || '');
@@ -175,6 +209,7 @@ export const App = (): JSX.Element => {
     setState(nextState);
     setWindows(nextWindows);
     setHotkey(nextHotkey);
+    setSelectedIds(new Set());
   };
 
   useEffect(() => {
@@ -365,6 +400,19 @@ export const App = (): JSX.Element => {
           <div className="window-list">
             {filteredWindows.map((item) => (
               <article className="window-row" key={item.id}>
+                <input
+                  type="checkbox"
+                  className="window-checkbox"
+                  checked={selectedIds.has(item.id)}
+                  onChange={() => toggleSelect(item.id)}
+                />
+                <div className="window-thumbnail-container">
+                  {item.thumbnail ? (
+                    <img src={item.thumbnail} alt={item.title} className="window-thumbnail" />
+                  ) : (
+                    <div className="window-thumbnail-placeholder">썸네일 없음</div>
+                  )}
+                </div>
                 <div className="window-main">
                   <strong>{item.title}</strong>
                   <span>{basename(item.processPath)}</span>
@@ -394,6 +442,16 @@ export const App = (): JSX.Element => {
               </div>
             )}
           </div>
+          {selectedIds.size > 0 && (
+            <div className="batch-action-bar">
+              <span>{selectedIds.size}개 창 선택됨</span>
+              <div className="batch-buttons">
+                <button onClick={() => addSelectedToGroup('work')}>업무 등록</button>
+                <button onClick={() => addSelectedToGroup('play')}>여가 등록</button>
+                <button className="danger" onClick={() => setSelectedIds(new Set())}>선택 해제</button>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="panel group-grid">

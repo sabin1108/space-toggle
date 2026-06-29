@@ -23,6 +23,7 @@ export interface WindowSnapshot {
   rect: WindowRect | null;
   isVisible: boolean;
   identity: WindowIdentity;
+  thumbnail?: string;
 }
 
 export interface DropZoneState {
