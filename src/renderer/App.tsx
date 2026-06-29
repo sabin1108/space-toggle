@@ -22,14 +22,14 @@ import type {
 } from '../shared/types';
 
 const modeLabel: Record<Mode, string> = {
-  WORK: '업무',
-  PLAY: '여가',
+  WORK: '(메인)',
+  PLAY: '(보조)',
   NEUTRAL: '기본'
 };
 
 const groupLabel: Record<GroupName, string> = {
-  work: '업무 그룹',
-  play: '여가 그룹'
+  work: '(메인)',
+  play: '(보조)'
 };
 
 const basename = (value: string): string => {
@@ -343,13 +343,13 @@ export const App = (): JSX.Element => {
       </header>
 
       <section className="toolbar" aria-label="모드 제어">
-        <button className="tool-button" onClick={() => setMode('WORK')} title="업무 모드로 전환">
+        <button className="tool-button" onClick={() => setMode('WORK')} title="(메인) 모드로 전환">
           <BriefcaseBusiness size={18} />
-          <span>업무</span>
+          <span>(메인)</span>
         </button>
-        <button className="tool-button" onClick={() => setMode('PLAY')} title="여가 모드로 전환">
+        <button className="tool-button" onClick={() => setMode('PLAY')} title="(보조) 모드로 전환">
           <Gamepad2 size={18} />
-          <span>여가</span>
+          <span>(보조)</span>
         </button>
         <button className="tool-button" onClick={() => setMode('NEUTRAL')} title="기본 모드로 전환 (전체 표시)">
           <MonitorUp size={18} />
@@ -423,13 +423,13 @@ export const App = (): JSX.Element => {
                     onClick={() => addToGroup('work', item.identity)}
                     disabled={knownKeys.has(identityKey(item.identity))}
                   >
-                    업무
+                    (메인)
                   </button>
                   <button
                     onClick={() => addToGroup('play', item.identity)}
                     disabled={knownKeys.has(identityKey(item.identity))}
                   >
-                    여가
+                    (보조)
                   </button>
                   <button onClick={() => restoreWindowVisuals(item.identity)}>복구</button>
                 </div>
@@ -446,8 +446,8 @@ export const App = (): JSX.Element => {
             <div className="batch-action-bar">
               <span>{selectedIds.size}개 창 선택됨</span>
               <div className="batch-buttons">
-                <button onClick={() => addSelectedToGroup('work')}>업무 등록</button>
-                <button onClick={() => addSelectedToGroup('play')}>여가 등록</button>
+                <button onClick={() => addSelectedToGroup('work')}>(메인) 등록</button>
+                <button onClick={() => addSelectedToGroup('play')}>(보조) 등록</button>
                 <button className="danger" onClick={() => setSelectedIds(new Set())}>선택 해제</button>
               </div>
             </div>

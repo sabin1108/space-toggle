@@ -216,7 +216,7 @@ export class WindowManager {
       const { desktopCapturer } = require('electron');
       const sources = await desktopCapturer.getSources({
         types: ['window'],
-        thumbnailSize: { width: 160, height: 100 }
+        thumbnailSize: { width: 400, height: 250 }
       });
 
       const thumbnailMap = new Map<string, string>();
