@@ -22,14 +22,14 @@ import type {
 } from '../shared/types';
 
 const modeLabel: Record<Mode, string> = {
-  WORK: 'Work',
-  PLAY: 'Play',
-  NEUTRAL: 'Neutral'
+  WORK: '업무',
+  PLAY: '여가',
+  NEUTRAL: '기본'
 };
 
 const groupLabel: Record<GroupName, string> = {
-  work: 'Work',
-  play: 'Play'
+  work: '업무 그룹',
+  play: '여가 그룹'
 };
 
 const basename = (value: string): string => {
@@ -149,12 +149,12 @@ export const App = (): JSX.Element => {
       const result = await window.spaceToggle.updateHotkey(recordedKeys);
       setHotkey(result);
       if (result.registered) {
-        setMessage(`Hotkey changed to ${result.accelerator}`);
+        setMessage(`단축키가 ${result.accelerator}로 변경되었습니다.`);
         setMessageType('success');
         setFailures([]);
         setIsEditingHotkey(false);
       } else {
-        setMessage(result.error || 'Failed to update hotkey.');
+        setMessage(result.error || '단축키 업데이트에 실패했습니다.');
         setMessageType('error');
         setFailures([]);
         setIsEditingHotkey(false);
@@ -228,13 +228,7 @@ export const App = (): JSX.Element => {
     });
   };
 
-  const excludeFromAltTab = (identity: WindowIdentity): void => {
-    runOperation(window.spaceToggle.excludeFromAltTab(identity)).catch((error) => {
-      setMessage(String(error));
-      setMessageType('error');
-      setFailures([]);
-    });
-  };
+
 
   const restoreWindowVisuals = (identity: WindowIdentity): void => {
     runOperation(window.spaceToggle.restoreWindowVisuals(identity)).catch((error) => {
@@ -248,7 +242,7 @@ export const App = (): JSX.Element => {
     try {
       const nextState = await window.spaceToggle.addWindowToGroup(group, identity);
       setState(nextState);
-      setMessage(`${basename(identity.processPath)} added to ${groupLabel[group]}.`);
+      setMessage(`${basename(identity.processPath)} 창이 ${groupLabel[group]}에 추가되었습니다.`);
       setMessageType('success');
       setFailures([]);
     } catch (error) {
@@ -262,7 +256,7 @@ export const App = (): JSX.Element => {
     try {
       const nextState = await window.spaceToggle.removeWindowFromGroup(group, identity);
       setState(nextState);
-      setMessage(`${basename(identity.processPath)} removed from ${groupLabel[group]}.`);
+      setMessage(`${basename(identity.processPath)} 창이 ${groupLabel[group]}에서 제거되었습니다.`);
       setMessageType('success');
       setFailures([]);
     } catch (error) {
@@ -281,7 +275,7 @@ export const App = (): JSX.Element => {
     <main className="shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Windows desktop utility</p>
+          <p className="eyebrow">윈도우 데스크톱 유틸리티</p>
           <h1>SpaceToggle</h1>
         </div>
         <div className="status-strip">
@@ -294,43 +288,43 @@ export const App = (): JSX.Element => {
                 className="hotkey-recorder-input"
                 value={recordedKeys}
                 readOnly
-                placeholder="Press keys..."
+                placeholder="단축키 입력..."
                 onKeyDown={handleHotkeyKeyDown}
               />
-              <button className="hotkey-btn" onClick={saveHotkey}>Save</button>
-              <button className="hotkey-btn danger" onClick={cancelHotkeyEditing}>Cancel</button>
+              <button className="hotkey-btn" onClick={saveHotkey}>저장</button>
+              <button className="hotkey-btn danger" onClick={cancelHotkeyEditing}>취소</button>
             </div>
           ) : (
             <div className="hotkey-container">
               <span className={hotkey?.registered ? 'signal ok' : 'signal warn'}>
-                {hotkey?.registered ? hotkey.accelerator : 'Hotkey unavailable'}
+                {hotkey?.registered ? hotkey.accelerator : '단축키 미지정'}
               </span>
               <button className="hotkey-edit-btn" onClick={startHotkeyEditing}>
-                Edit
+                수정
               </button>
             </div>
           )}
         </div>
       </header>
 
-      <section className="toolbar" aria-label="Mode controls">
-        <button className="tool-button" onClick={() => setMode('WORK')} title="Switch to Work">
+      <section className="toolbar" aria-label="모드 제어">
+        <button className="tool-button" onClick={() => setMode('WORK')} title="업무 모드로 전환">
           <BriefcaseBusiness size={18} />
-          <span>Work</span>
+          <span>업무</span>
         </button>
-        <button className="tool-button" onClick={() => setMode('PLAY')} title="Switch to Play">
+        <button className="tool-button" onClick={() => setMode('PLAY')} title="여가 모드로 전환">
           <Gamepad2 size={18} />
-          <span>Play</span>
+          <span>여가</span>
         </button>
-        <button className="tool-button" onClick={() => setMode('NEUTRAL')} title="Show both groups">
+        <button className="tool-button" onClick={() => setMode('NEUTRAL')} title="기본 모드로 전환 (전체 표시)">
           <MonitorUp size={18} />
-          <span>Neutral</span>
+          <span>기본</span>
         </button>
-        <button className="tool-button danger" onClick={forceRestore} title="Force restore all windows">
+        <button className="tool-button danger" onClick={forceRestore} title="모든 창 원래 위치로 강제 복구">
           <RotateCcw size={18} />
-          <span>Restore</span>
+          <span>복구</span>
         </button>
-        <button className="icon-button" onClick={refresh} title="Refresh windows">
+        <button className="icon-button" onClick={refresh} title="창 목록 새로고침">
           <RefreshCw size={18} />
         </button>
       </section>
@@ -358,14 +352,14 @@ export const App = (): JSX.Element => {
         <section className="panel window-panel">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">Live HWND bindings</p>
-              <h2>Open Windows</h2>
+              <p className="eyebrow">실시간 실행 중인 창</p>
+              <h2>열린 창 목록</h2>
             </div>
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Filter"
-              aria-label="Filter windows"
+              placeholder="검색 필터"
+              aria-label="창 필터링"
             />
           </div>
           <div className="window-list">
@@ -374,30 +368,29 @@ export const App = (): JSX.Element => {
                 <div className="window-main">
                   <strong>{item.title}</strong>
                   <span>{basename(item.processPath)}</span>
-                  <small>{item.className ?? 'No class name'}</small>
+                  <small>{item.className ?? '클래스 이름 없음'}</small>
                 </div>
                 <div className="row-actions">
                   <button
                     onClick={() => addToGroup('work', item.identity)}
                     disabled={knownKeys.has(identityKey(item.identity))}
                   >
-                    Work
+                    업무
                   </button>
                   <button
                     onClick={() => addToGroup('play', item.identity)}
                     disabled={knownKeys.has(identityKey(item.identity))}
                   >
-                    Play
+                    여가
                   </button>
-                  <button onClick={() => excludeFromAltTab(item.identity)}>AltTab-</button>
-                  <button onClick={() => restoreWindowVisuals(item.identity)}>Restore</button>
+                  <button onClick={() => restoreWindowVisuals(item.identity)}>복구</button>
                 </div>
               </article>
             ))}
             {filteredWindows.length === 0 && (
               <div className="empty-state">
                 <ListRestart size={22} />
-                <span>No matching windows found.</span>
+                <span>일치하는 창이 없습니다.</span>
               </div>
             )}
           </div>
@@ -430,7 +423,7 @@ const GroupPanel = ({ group, items, onRemove }: GroupPanelProps): JSX.Element =>
   <div className="group-column">
     <div className="panel-heading compact">
       <div>
-        <p className="eyebrow">Saved identities</p>
+        <p className="eyebrow">저장된 창 식별 정보</p>
         <h2>{groupLabel[group]}</h2>
       </div>
       <span className="count">{items.length}</span>
@@ -441,12 +434,12 @@ const GroupPanel = ({ group, items, onRemove }: GroupPanelProps): JSX.Element =>
           <div>
             <strong>{basename(item.processPath)}</strong>
             <span>{item.titlePattern}</span>
-            <small>{item.className ?? 'Any class'}</small>
+            <small>{item.className ?? '모든 클래스'}</small>
           </div>
-          <button onClick={() => onRemove(item)}>Remove</button>
+          <button onClick={() => onRemove(item)}>삭제</button>
         </article>
       ))}
-      {items.length === 0 && <p className="muted">No windows assigned.</p>}
+      {items.length === 0 && <p className="muted">등록된 창이 없습니다.</p>}
     </div>
   </div>
 );
@@ -475,8 +468,8 @@ const DropZoneOverlay = (): JSX.Element => {
       <div className="dropzone-border">
         <div className="dropzone-content">
           <MonitorUp size={32} className="dropzone-icon" />
-          <h2>Drop Zone</h2>
-          <p className="dropzone-count">{count} window(s) captured</p>
+          <h2>드롭존 (Drop Zone)</h2>
+          <p className="dropzone-count">{count}개의 창 캡처됨</p>
         </div>
       </div>
     </div>
