@@ -196,12 +196,12 @@ console.log('\n--- Phase 2: Mock WindowManager Assertions ---');
 class MockStateRepository {
   constructor() {
     this.state = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       currentMode: 'NEUTRAL',
-      groups: {
-        work: [],
-        play: []
-      },
+      categories: [
+        { id: 'work', name: '(메인)', windows: [] },
+        { id: 'play', name: '(보조)', windows: [] }
+      ],
       dropZone: {
         x: 80,
         y: 80,
@@ -229,16 +229,43 @@ class MockStateRepository {
     return this.get();
   }
 
-  addToGroup(group, identity) {
-    this.state.groups[group].push(identity);
+  createCategory(name) {
+    const id = 'cat_' + Date.now();
+    this.state.categories.push({ id, name, windows: [] });
     return this.get();
   }
 
-  removeFromGroup(group, identity) {
-    this.state.groups[group] = this.state.groups[group].filter(
-      (i) => i.processPath !== identity.processPath
-    );
+  deleteCategory(id) {
+    this.state.categories = this.state.categories.filter(c => c.id !== id);
     return this.get();
+  }
+
+  renameCategory(id, name) {
+    const cat = this.state.categories.find(c => c.id === id);
+    if (cat) cat.name = name;
+    return this.get();
+  }
+
+  addWindowToCategory(categoryId, identity) {
+    const cat = this.state.categories.find(c => c.id === categoryId);
+    if (cat) cat.windows.push(identity);
+    return this.get();
+  }
+
+  removeWindowFromCategory(categoryId, identity) {
+    const cat = this.state.categories.find(c => c.id === categoryId);
+    if (cat) {
+      cat.windows = cat.windows.filter(w => w.processPath !== identity.processPath);
+    }
+    return this.get();
+  }
+
+  addToGroup(group, identity) {
+    return this.addWindowToCategory(group, identity);
+  }
+
+  removeFromGroup(group, identity) {
+    return this.removeWindowFromCategory(group, identity);
   }
 
   addModifiedWindow(record) {

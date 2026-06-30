@@ -6,8 +6,7 @@ import type { HotkeyController } from './hotkeys';
 import type { StateRepository } from './state';
 import type { WindowManager } from './window-manager';
 
-const groupSchema = z.enum(['work', 'play']);
-const modeSchema = z.enum(['WORK', 'PLAY', 'NEUTRAL']);
+const modeSchema = z.string().trim().min(1);
 const identitySchema = z.object({
   processPath: z.string().trim().min(1).max(2048),
   titlePattern: z.string().trim().min(1).max(512),
@@ -15,7 +14,12 @@ const identitySchema = z.object({
 });
 
 const groupIdentitySchema = z.object({
-  group: groupSchema,
+  group: z.string().trim().min(1),
+  identity: identitySchema
+});
+
+const categoryIdentitySchema = z.object({
+  categoryId: z.string().trim().min(1),
   identity: identitySchema
 });
 
@@ -43,23 +47,46 @@ export const registerIpcHandlers = (
   });
 
   ipcMain.handle(IPC_CHANNELS.SET_MODE, (_event, payload: unknown) => {
-    const mode = modeSchema.parse(payload) as Mode;
+    const mode = modeSchema.parse(payload) as string;
     return windows.setMode(mode);
   });
 
   ipcMain.handle(IPC_CHANNELS.ADD_WINDOW_TO_GROUP, (_event, payload: unknown) => {
-    const parsed = groupIdentitySchema.parse(payload) as {
-      group: GroupName;
-      identity: WindowIdentity;
-    };
+    const parsed = groupIdentitySchema.parse(payload);
     return windows.addToGroup(parsed.group, parsed.identity);
   });
 
   ipcMain.handle(IPC_CHANNELS.REMOVE_WINDOW_FROM_GROUP, (_event, payload: unknown) => {
-    const parsed = groupIdentitySchema.parse(payload) as {
-      group: GroupName;
-      identity: WindowIdentity;
-    };
+    const parsed = groupIdentitySchema.parse(payload);
     return windows.removeFromGroup(parsed.group, parsed.identity);
   });
+
+  ipcMain.handle(IPC_CHANNELS.CREATE_CATEGORY, (_event, payload: unknown) => {
+    const name = z.string().trim().min(1).max(256).parse(payload);
+    return windows.createCategory(name);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.DELETE_CATEGORY, (_event, payload: unknown) => {
+    const id = z.string().trim().min(1).parse(payload);
+    return windows.deleteCategory(id);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.RENAME_CATEGORY, (_event, payload: unknown) => {
+    const parsed = z.object({
+      id: z.string().trim().min(1),
+      name: z.string().trim().min(1).max(256)
+    }).parse(payload);
+    return windows.renameCategory(parsed.id, parsed.name);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.ADD_WINDOW_TO_CATEGORY, (_event, payload: unknown) => {
+    const parsed = categoryIdentitySchema.parse(payload);
+    return windows.addWindowToCategory(parsed.categoryId, parsed.identity);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.REMOVE_WINDOW_FROM_CATEGORY, (_event, payload: unknown) => {
+    const parsed = categoryIdentitySchema.parse(payload);
+    return windows.removeWindowFromCategory(parsed.categoryId, parsed.identity);
+  });
 };
+

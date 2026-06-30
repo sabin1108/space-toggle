@@ -14,6 +14,13 @@ type NativeWindow = ReturnType<Win32Service['listWindows']>[number];
 
 const normalize = (value: string): string => value.trim().toLocaleLowerCase();
 
+const identityKey = (identity: WindowIdentity): string =>
+  [
+    normalize(identity.processPath),
+    normalize(identity.titlePattern),
+    normalize(identity.className ?? '')
+  ].join('|');
+
 const basename = (value: string): string => {
   const parts = value.split(/[\\/]/g);
   return parts[parts.length - 1] || value;
@@ -244,33 +251,72 @@ export class WindowManager {
     return snapshots;
   }
 
-  addToGroup(group: GroupName, identity: WindowIdentity): AppState {
+  addToGroup(group: string, identity: WindowIdentity): AppState {
     this.invalidateCache();
     return this.state.addToGroup(group, identity);
   }
 
-  removeFromGroup(group: GroupName, identity: WindowIdentity): AppState {
+  removeFromGroup(group: string, identity: WindowIdentity): AppState {
     this.invalidateCache();
     return this.state.removeFromGroup(group, identity);
   }
 
+  createCategory(name: string): AppState {
+    return this.state.createCategory(name);
+  }
+
+  deleteCategory(id: string): AppState {
+    this.invalidateCache();
+    return this.state.deleteCategory(id);
+  }
+
+  renameCategory(id: string, name: string): AppState {
+    return this.state.renameCategory(id, name);
+  }
+
+  addWindowToCategory(categoryId: string, identity: WindowIdentity): AppState {
+    this.invalidateCache();
+    return this.state.addWindowToCategory(categoryId, identity);
+  }
+
+  removeWindowFromCategory(categoryId: string, identity: WindowIdentity): AppState {
+    this.invalidateCache();
+    return this.state.removeWindowFromCategory(categoryId, identity);
+  }
+
   toggleMode(): OperationResult {
-    const currentMode = this.state.get().currentMode;
-    const nextMode: Mode = currentMode === 'WORK' ? 'PLAY' : 'WORK';
+    const state = this.state.get();
+    const categories = state.categories;
+    if (categories.length === 0) {
+      return this.setMode('NEUTRAL');
+    }
+
+    const currentMode = state.currentMode;
+    const currentIndex = categories.findIndex((c) => c.id.toLowerCase() === currentMode.toLowerCase());
+
+    let nextMode: string;
+    if (currentIndex === -1 || currentMode === 'NEUTRAL') {
+      nextMode = categories[0].id;
+    } else if (currentIndex === categories.length - 1) {
+      nextMode = 'NEUTRAL';
+    } else {
+      nextMode = categories[currentIndex + 1].id;
+    }
+
     return this.setMode(nextMode);
   }
 
-  setMode(mode: Mode): OperationResult {
+  setMode(mode: string): OperationResult {
     this.invalidateCache();
-    const snapshot = this.state.setMode(mode);
+    const canonicalMode = mode.toUpperCase() === 'NEUTRAL' ? 'NEUTRAL' : mode;
+    const snapshot = this.state.setMode(canonicalMode);
     const windows = this.win32.listWindows();
     this.cachedWindows = windows;
     this.lastFetchTime = Date.now();
     for (const item of windows) {
       this.activeWindows.set(item.snapshot.id, item);
     }
-    const work = this.bindGroup(windows, snapshot.groups.work);
-    const play = this.bindGroup(windows, snapshot.groups.play);
+    
     const failures: string[] = [];
     let changedCount = 0;
 
@@ -295,15 +341,28 @@ export class WindowManager {
       }
     };
 
-    if (mode === 'WORK') {
-      apply(work, true);
-      apply(play, false);
-    } else if (mode === 'PLAY') {
-      apply(work, false);
-      apply(play, true);
+    if (canonicalMode === 'NEUTRAL') {
+      const allIdentities = uniqueIdentities(
+        snapshot.categories.flatMap((cat) => cat.windows)
+      );
+      const allNative = this.bindGroup(windows, allIdentities);
+      apply(allNative, true);
     } else {
-      apply(work, true);
-      apply(play, true);
+      const activeCat = snapshot.categories.find((c) => c.id.toLowerCase() === canonicalMode.toLowerCase());
+      const activeIdentities = activeCat ? activeCat.windows : [];
+      const activeNative = this.bindGroup(windows, activeIdentities);
+
+      const inactiveCats = snapshot.categories.filter((c) => c.id.toLowerCase() !== (activeCat ? activeCat.id.toLowerCase() : ''));
+      const activeKeys = new Set(activeIdentities.map(identityKey));
+      
+      const inactiveIdentities = uniqueIdentities(
+        inactiveCats.flatMap((cat) => cat.windows)
+      ).filter((id) => !activeKeys.has(identityKey(id)));
+      
+      const inactiveNative = this.bindGroup(windows, inactiveIdentities);
+
+      apply(activeNative, true);
+      apply(inactiveNative, false);
     }
 
     return {
@@ -373,7 +432,7 @@ export class WindowManager {
     const failures: string[] = [];
     let changedCount = 0;
 
-    // 1. Restore all tracked modified windows
+    // 1. 드롭존 변경 등 임시 스타일이 적용된 모든 윈도우 원래대로 복구
     for (const record of snapshot.modifiedWindows) {
       const window = this.bindOne(record.identity);
       if (window) {
@@ -389,18 +448,17 @@ export class WindowManager {
       }
     }
 
-    // 2. Clear state lists
+    // 2. 관리 데이터 초기화 및 드롭존 영역 비우기
     this.state.clearModifiedWindows();
     const nextState = this.state.get();
     for (const dzWin of [...nextState.dropZone.capturedWindows]) {
       this.state.removeWindowFromDropZone(dzWin);
     }
 
-    // 3. Restore all work/play windows
-    const identities = uniqueIdentities([
-      ...snapshot.groups.work,
-      ...snapshot.groups.play
-    ]);
+    // 3. 각 카테고리에 저장되었던 모든 윈도우 스타일 복원 (전체 표시)
+    const identities = uniqueIdentities(
+      snapshot.categories.flatMap((cat) => cat.windows)
+    );
     const windows = this.bindGroup(winList, identities);
     for (const window of windows) {
       const result = this.win32.restoreWindowVisuals(window.hwnd);

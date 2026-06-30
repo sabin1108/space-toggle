@@ -13,24 +13,13 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import type {
   AppState,
-  GroupName,
+  Category,
   HotkeyStatus,
   Mode,
   OperationResult,
   WindowIdentity,
   WindowSnapshot
 } from '../shared/types';
-
-const modeLabel: Record<Mode, string> = {
-  WORK: '(메인)',
-  PLAY: '(보조)',
-  NEUTRAL: '기본'
-};
-
-const groupLabel: Record<GroupName, string> = {
-  work: '(메인)',
-  play: '(보조)'
-};
 
 const basename = (value: string): string => {
   const parts = value.split(/[\\/]/g);
@@ -41,12 +30,9 @@ const identityKey = (identity: WindowIdentity): string =>
   [identity.processPath, identity.titlePattern, identity.className ?? ''].join('|');
 
 const emptyState: AppState = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   currentMode: 'NEUTRAL',
-  groups: {
-    work: [],
-    play: []
-  },
+  categories: [],
   dropZone: {
     x: 80,
     y: 80,
@@ -58,6 +44,7 @@ const emptyState: AppState = {
   modifiedWindows: [],
   lastCleanShutdown: true
 };
+
 
 export const App = (): JSX.Element => {
   const [hash, setHash] = useState(window.location.hash);
@@ -93,6 +80,9 @@ export const App = (): JSX.Element => {
   const [recordedKeys, setRecordedKeys] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // 카테고리(그룹) 생성용 상태 변수
+  const [newCatName, setNewCatName] = useState('');
+
   const toggleSelect = (id: string): void => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -105,17 +95,58 @@ export const App = (): JSX.Element => {
     });
   };
 
-  const addSelectedToGroup = async (group: GroupName): Promise<void> => {
+  const createCategory = async () => {
+    if (!newCatName.trim()) return;
+    try {
+      const nextState = await window.spaceToggle.createCategory(newCatName);
+      setState(nextState);
+      setMessage(`새 카테고리 "${newCatName}"가 생성되었습니다.`);
+      setMessageType('success');
+      setNewCatName('');
+    } catch (error) {
+      setMessage(String(error));
+      setMessageType('error');
+    }
+  };
+
+  const deleteCategory = async (id: string, name: string) => {
+    if (!window.confirm(`카테고리 "${name}"을 삭제하시겠습니까?`)) return;
+    try {
+      const nextState = await window.spaceToggle.deleteCategory(id);
+      setState(nextState);
+      setMessage(`카테고리 "${name}"이 삭제되었습니다.`);
+      setMessageType('success');
+    } catch (error) {
+      setMessage(String(error));
+      setMessageType('error');
+    }
+  };
+
+  const saveRename = async (id: string, newName: string) => {
+    if (!newName.trim()) return;
+    try {
+      const nextState = await window.spaceToggle.renameCategory(id, newName);
+      setState(nextState);
+      setMessage('카테고리 이름이 수정되었습니다.');
+      setMessageType('success');
+    } catch (error) {
+      setMessage(String(error));
+      setMessageType('error');
+    }
+  };
+
+  const addSelectedToCategory = async (categoryId: string): Promise<void> => {
     const targets = windows.filter((w) => selectedIds.has(w.id));
     if (targets.length === 0) return;
 
     try {
       let lastState = state;
       for (const item of targets) {
-        lastState = await window.spaceToggle.addWindowToGroup(group, item.identity);
+        lastState = await window.spaceToggle.addWindowToCategory(categoryId, item.identity);
       }
       setState(lastState);
-      setMessage(`${targets.length}개의 창이 ${groupLabel[group]}에 등록되었습니다.`);
+      const catName = lastState.categories.find(c => c.id === categoryId)?.name || categoryId;
+      setMessage(`${targets.length}개의 창이 ${catName}에 등록되었습니다.`);
       setMessageType('success');
       setFailures([]);
       setSelectedIds(new Set());
@@ -247,7 +278,7 @@ export const App = (): JSX.Element => {
     await refresh();
   };
 
-  const setMode = (mode: Mode): void => {
+  const setMode = (mode: string): void => {
     runOperation(window.spaceToggle.setMode(mode)).catch((error) => {
       setMessage(String(error));
       setMessageType('error');
@@ -263,8 +294,6 @@ export const App = (): JSX.Element => {
     });
   };
 
-
-
   const restoreWindowVisuals = (identity: WindowIdentity): void => {
     runOperation(window.spaceToggle.restoreWindowVisuals(identity)).catch((error) => {
       setMessage(String(error));
@@ -273,11 +302,12 @@ export const App = (): JSX.Element => {
     });
   };
 
-  const addToGroup = async (group: GroupName, identity: WindowIdentity): Promise<void> => {
+  const addToCategory = async (categoryId: string, identity: WindowIdentity): Promise<void> => {
     try {
-      const nextState = await window.spaceToggle.addWindowToGroup(group, identity);
+      const nextState = await window.spaceToggle.addWindowToCategory(categoryId, identity);
       setState(nextState);
-      setMessage(`${basename(identity.processPath)} 창이 ${groupLabel[group]}에 추가되었습니다.`);
+      const catName = nextState.categories.find(c => c.id === categoryId)?.name || categoryId;
+      setMessage(`${basename(identity.processPath)} 창이 ${catName}에 추가되었습니다.`);
       setMessageType('success');
       setFailures([]);
     } catch (error) {
@@ -287,11 +317,12 @@ export const App = (): JSX.Element => {
     }
   };
 
-  const removeFromGroup = async (group: GroupName, identity: WindowIdentity): Promise<void> => {
+  const removeFromCategory = async (categoryId: string, identity: WindowIdentity): Promise<void> => {
     try {
-      const nextState = await window.spaceToggle.removeWindowFromGroup(group, identity);
+      const nextState = await window.spaceToggle.removeWindowFromCategory(categoryId, identity);
       setState(nextState);
-      setMessage(`${basename(identity.processPath)} 창이 ${groupLabel[group]}에서 제거되었습니다.`);
+      const catName = nextState.categories.find(c => c.id === categoryId)?.name || categoryId;
+      setMessage(`${basename(identity.processPath)} 창이 ${catName}에서 제거되었습니다.`);
       setMessageType('success');
       setFailures([]);
     } catch (error) {
@@ -301,10 +332,17 @@ export const App = (): JSX.Element => {
     }
   };
 
-  const knownKeys = new Set([
-    ...state.groups.work.map(identityKey),
-    ...state.groups.play.map(identityKey)
-  ]);
+  const knownKeys = useMemo(() => {
+    return new Set(
+      state.categories.flatMap((cat) => cat.windows.map(identityKey))
+    );
+  }, [state.categories]);
+
+  const activeModeName = useMemo(() => {
+    if (state.currentMode === 'NEUTRAL') return '기본';
+    const activeCat = state.categories.find((c) => c.id === state.currentMode);
+    return activeCat ? activeCat.name : state.currentMode;
+  }, [state.currentMode, state.categories]);
 
   return (
     <main className="shell">
@@ -315,7 +353,7 @@ export const App = (): JSX.Element => {
         </div>
         <div className="status-strip">
           <span className={`mode-pill mode-${state.currentMode.toLocaleLowerCase()}`}>
-            {modeLabel[state.currentMode]}
+            {activeModeName}
           </span>
           {isEditingHotkey ? (
             <div className="hotkey-container">
@@ -343,15 +381,28 @@ export const App = (): JSX.Element => {
       </header>
 
       <section className="toolbar" aria-label="모드 제어">
-        <button className="tool-button" onClick={() => setMode('WORK')} title="(메인) 모드로 전환">
-          <BriefcaseBusiness size={18} />
-          <span>(메인)</span>
-        </button>
-        <button className="tool-button" onClick={() => setMode('PLAY')} title="(보조) 모드로 전환">
-          <Gamepad2 size={18} />
-          <span>(보조)</span>
-        </button>
-        <button className="tool-button" onClick={() => setMode('NEUTRAL')} title="기본 모드로 전환 (전체 표시)">
+        {state.categories.map((cat) => (
+          <button
+            key={cat.id}
+            className={`tool-button ${state.currentMode === cat.id ? 'active' : ''}`}
+            onClick={() => setMode(cat.id)}
+            title={`"${cat.name}" 모드로 전환`}
+          >
+            {cat.id === 'work' ? (
+              <BriefcaseBusiness size={18} />
+            ) : cat.id === 'play' ? (
+              <Gamepad2 size={18} />
+            ) : (
+              <BriefcaseBusiness size={18} />
+            )}
+            <span>{cat.name}</span>
+          </button>
+        ))}
+        <button
+          className={`tool-button ${state.currentMode === 'NEUTRAL' ? 'active' : ''}`}
+          onClick={() => setMode('NEUTRAL')}
+          title="기본 모드로 전환 (전체 표시)"
+        >
           <MonitorUp size={18} />
           <span>기본</span>
         </button>
@@ -419,18 +470,25 @@ export const App = (): JSX.Element => {
                   <small>{item.className ?? '클래스 이름 없음'}</small>
                 </div>
                 <div className="row-actions">
-                  <button
-                    onClick={() => addToGroup('work', item.identity)}
-                    disabled={knownKeys.has(identityKey(item.identity))}
+                  <select
+                    className="category-add-select"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        addToCategory(e.target.value, item.identity);
+                      }
+                    }}
                   >
-                    (메인)
-                  </button>
-                  <button
-                    onClick={() => addToGroup('play', item.identity)}
-                    disabled={knownKeys.has(identityKey(item.identity))}
-                  >
-                    (보조)
-                  </button>
+                    <option value="">+ 카테고리 추가</option>
+                    {state.categories.map((cat) => {
+                      const alreadyIn = cat.windows.some((w) => identityKey(w) === identityKey(item.identity));
+                      return (
+                        <option key={cat.id} value={cat.id} disabled={alreadyIn}>
+                          {cat.name}
+                        </option>
+                      );
+                    })}
+                  </select>
                   <button onClick={() => restoreWindowVisuals(item.identity)}>복구</button>
                 </div>
               </article>
@@ -446,8 +504,22 @@ export const App = (): JSX.Element => {
             <div className="batch-action-bar">
               <span>{selectedIds.size}개 창 선택됨</span>
               <div className="batch-buttons">
-                <button onClick={() => addSelectedToGroup('work')}>(메인) 등록</button>
-                <button onClick={() => addSelectedToGroup('play')}>(보조) 등록</button>
+                <select
+                  className="category-batch-select"
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      addSelectedToCategory(e.target.value);
+                    }
+                  }}
+                >
+                  <option value="">선택 항목 등록...</option>
+                  {state.categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
                 <button className="danger" onClick={() => setSelectedIds(new Set())}>선택 해제</button>
               </div>
             </div>
@@ -455,52 +527,127 @@ export const App = (): JSX.Element => {
         </section>
 
         <section className="panel group-grid">
-          <GroupPanel
-            group="work"
-            items={state.groups.work}
-            onRemove={(identity) => removeFromGroup('work', identity)}
-          />
-          <GroupPanel
-            group="play"
-            items={state.groups.play}
-            onRemove={(identity) => removeFromGroup('play', identity)}
-          />
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">그룹 분류 설정</p>
+              <h2>카테고리 목록</h2>
+            </div>
+            <div className="create-category-container">
+              <input
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                placeholder="새 카테고리명"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') createCategory();
+                }}
+              />
+              <button onClick={createCategory}>추가</button>
+            </div>
+          </div>
+          <div className="categories-list">
+            {state.categories.map((cat) => (
+              <CategoryPanel
+                key={cat.id}
+                category={cat}
+                onRemove={(identity) => removeFromCategory(cat.id, identity)}
+                onDelete={() => deleteCategory(cat.id, cat.name)}
+                onRename={(newName) => saveRename(cat.id, newName)}
+              />
+            ))}
+            {state.categories.length === 0 && (
+              <p className="muted">생성된 카테고리가 없습니다.</p>
+            )}
+          </div>
         </section>
       </div>
     </main>
   );
 };
 
-interface GroupPanelProps {
-  group: GroupName;
-  items: WindowIdentity[];
+interface CategoryPanelProps {
+  category: Category;
   onRemove(identity: WindowIdentity): void;
+  onDelete(): void;
+  onRename(newName: string): void;
 }
 
-const GroupPanel = ({ group, items, onRemove }: GroupPanelProps): JSX.Element => (
-  <div className="group-column">
-    <div className="panel-heading compact">
-      <div>
-        <p className="eyebrow">저장된 창 식별 정보</p>
-        <h2>{groupLabel[group]}</h2>
+const CategoryPanel = ({ category, onRemove, onDelete, onRename }: CategoryPanelProps): JSX.Element => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [nameInput, setNameInput] = useState(category.name);
+
+  const handleSave = () => {
+    if (nameInput.trim() && nameInput.trim() !== category.name) {
+      onRename(nameInput.trim());
+    }
+    setIsEditing(false);
+  };
+
+  return (
+    <div className="group-column">
+      <div className="panel-heading compact">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+          {isEditing ? (
+            <input
+              className="category-rename-input"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onBlur={handleSave}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSave();
+                if (e.key === 'Escape') {
+                  setNameInput(category.name);
+                  setIsEditing(false);
+                }
+              }}
+              autoFocus
+            />
+          ) : (
+            <h2
+              onDoubleClick={() => {
+                setNameInput(category.name);
+                setIsEditing(true);
+              }}
+              title="더블클릭하여 이름 수정"
+              style={{ cursor: 'pointer' }}
+            >
+              {category.name}
+            </h2>
+          )}
+          <button
+            className="category-action-btn"
+            onClick={() => {
+              if (isEditing) {
+                handleSave();
+              } else {
+                setNameInput(category.name);
+                setIsEditing(true);
+              }
+            }}
+          >
+            {isEditing ? '저장' : '수정'}
+          </button>
+          <button className="category-action-btn danger" onClick={onDelete}>
+            삭제
+          </button>
+        </div>
+        <span className="count">{category.windows.length}</span>
       </div>
-      <span className="count">{items.length}</span>
+      <div className="identity-list">
+        {category.windows.map((item) => (
+          <article className="identity-row" key={identityKey(item)}>
+            <div>
+              <strong>{basename(item.processPath)}</strong>
+              <span>{item.titlePattern}</span>
+              <small>{item.className ?? '모든 클래스'}</small>
+            </div>
+            <button onClick={() => onRemove(item)}>삭제</button>
+          </article>
+        ))}
+        {category.windows.length === 0 && <p className="muted">등록된 창이 없습니다.</p>}
+      </div>
     </div>
-    <div className="identity-list">
-      {items.map((item) => (
-        <article className="identity-row" key={identityKey(item)}>
-          <div>
-            <strong>{basename(item.processPath)}</strong>
-            <span>{item.titlePattern}</span>
-            <small>{item.className ?? '모든 클래스'}</small>
-          </div>
-          <button onClick={() => onRemove(item)}>삭제</button>
-        </article>
-      ))}
-      {items.length === 0 && <p className="muted">등록된 창이 없습니다.</p>}
-    </div>
-  </div>
-);
+  );
+};
 
 const DropZoneOverlay = (): JSX.Element => {
   const [state, setState] = useState<AppState>(emptyState);
