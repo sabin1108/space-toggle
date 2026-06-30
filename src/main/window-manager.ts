@@ -432,7 +432,7 @@ export class WindowManager {
     const failures: string[] = [];
     let changedCount = 0;
 
-    // 1. 드롭존 변경 등 임시 스타일이 적용된 모든 윈도우 원래대로 복구
+    // 드롭존 변경 등 임시 스타일이 적용된 모든 윈도우 원래대로 복구
     for (const record of snapshot.modifiedWindows) {
       const window = this.bindOne(record.identity);
       if (window) {
@@ -448,14 +448,14 @@ export class WindowManager {
       }
     }
 
-    // 2. 관리 데이터 초기화 및 드롭존 영역 비우기
+    // 관리 데이터 초기화 및 드롭존 영역 비우기
     this.state.clearModifiedWindows();
     const nextState = this.state.get();
     for (const dzWin of [...nextState.dropZone.capturedWindows]) {
       this.state.removeWindowFromDropZone(dzWin);
     }
 
-    // 3. 각 카테고리에 저장되었던 모든 윈도우 스타일 복원 (전체 표시)
+    // 각 카테고리에 저장되었던 모든 윈도우 스타일 복원 (전체 표시)
     const identities = uniqueIdentities(
       snapshot.categories.flatMap((cat) => cat.windows)
     );
