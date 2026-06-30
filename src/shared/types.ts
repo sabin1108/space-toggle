@@ -1,6 +1,12 @@
-export type Mode = 'WORK' | 'PLAY' | 'NEUTRAL';
+export type Mode = 'NEUTRAL' | string;
 
-export type GroupName = 'work' | 'play';
+export type GroupName = string;
+
+export interface Category {
+  id: string;
+  name: string;
+  windows: WindowIdentity[];
+}
 
 export interface WindowIdentity {
   processPath: string;
@@ -45,10 +51,7 @@ export interface ModifiedWindowRecord {
 export interface AppState {
   schemaVersion: number;
   currentMode: Mode;
-  groups: {
-    work: WindowIdentity[];
-    play: WindowIdentity[];
-  };
+  categories: Category[];
   dropZone: DropZoneState;
   modifiedWindows: ModifiedWindowRecord[];
   lastCleanShutdown: boolean;
@@ -71,14 +74,20 @@ export interface HotkeyStatus {
 export interface SpaceToggleApi {
   getState(): Promise<AppState>;
   listWindows(): Promise<WindowSnapshot[]>;
-  addWindowToGroup(group: GroupName, identity: WindowIdentity): Promise<AppState>;
-  removeWindowFromGroup(group: GroupName, identity: WindowIdentity): Promise<AppState>;
-  setMode(mode: Mode): Promise<OperationResult>;
+  addWindowToGroup(group: string, identity: WindowIdentity): Promise<AppState>;
+  removeWindowFromGroup(group: string, identity: WindowIdentity): Promise<AppState>;
+  setMode(mode: string): Promise<OperationResult>;
   toggleMode(): Promise<OperationResult>;
   excludeFromAltTab(identity: WindowIdentity): Promise<OperationResult>;
   restoreWindowVisuals(identity: WindowIdentity): Promise<OperationResult>;
   forceRestore(): Promise<OperationResult>;
   getHotkeyStatus(): Promise<HotkeyStatus>;
   updateHotkey(accelerator: string): Promise<HotkeyStatus>;
+  createCategory(name: string): Promise<AppState>;
+  deleteCategory(id: string): Promise<AppState>;
+  renameCategory(id: string, name: string): Promise<AppState>;
+  addWindowToCategory(categoryId: string, identity: WindowIdentity): Promise<AppState>;
+  removeWindowFromCategory(categoryId: string, identity: WindowIdentity): Promise<AppState>;
 }
+
 

@@ -9,5 +9,11 @@ export const IPC_CHANNELS = {
   RESTORE_WINDOW_VISUALS: 'spacetoggle:restore-window-visuals',
   FORCE_RESTORE: 'spacetoggle:force-restore',
   GET_HOTKEY_STATUS: 'spacetoggle:get-hotkey-status',
-  UPDATE_HOTKEY: 'spacetoggle:update-hotkey'
+  UPDATE_HOTKEY: 'spacetoggle:update-hotkey',
+  CREATE_CATEGORY: 'spacetoggle:create-category',
+  DELETE_CATEGORY: 'spacetoggle:delete-category',
+  RENAME_CATEGORY: 'spacetoggle:rename-category',
+  ADD_WINDOW_TO_CATEGORY: 'spacetoggle:add-window-to-category',
+  REMOVE_WINDOW_FROM_CATEGORY: 'spacetoggle:remove-window-from-category'
 } as const;
+

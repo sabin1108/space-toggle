@@ -532,4 +532,72 @@ h2 {
   gap: 8px;
 }
 
+/* Category CRUD Styles */
+.create-category-container {
+  display: flex;
+  gap: 6px;
+}
+
+.create-category-container input {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #cfd3c8;
+  border-radius: 4px;
+  font-size: 13px;
+  width: 130px;
+}
+
+.create-category-container button {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.category-action-btn {
+  height: 24px;
+  padding: 0 6px;
+  font-size: 11px;
+  border-color: #c9cdc2;
+}
+
+.category-action-btn.danger {
+  border-color: #d8b8aa;
+  color: #783c24;
+}
+
+.category-rename-input {
+  font-size: 16px;
+  font-weight: 700;
+  border: 1px solid #7c8b60;
+  border-radius: 4px;
+  padding: 2px 6px;
+  width: 140px;
+  height: 28px;
+}
+
+.category-add-select,
+.category-batch-select {
+  min-height: 30px;
+  border: 1px solid #c9cdc2;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #20211d;
+  padding: 0 8px;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.category-add-select:hover,
+.category-batch-select:hover {
+  border-color: #7c8b60;
+  background: #f3f6ed;
+}
+
+.categories-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+
 
