@@ -13,4 +13,7 @@ Do not duplicate content already captured in other artifacts (PRDs, plans, ADRs,
 
 Redact any sensitive information, such as API keys, passwords, or personally identifiable information.
 
+항상 모든 결과를 한글로 설명할 것 (Always explain all results in Korean).
+
 If the user passed arguments, treat them as a description of what the next session will focus on and tailor the doc accordingly.
+

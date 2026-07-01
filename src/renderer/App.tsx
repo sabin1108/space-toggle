@@ -53,7 +53,9 @@ const emptyState: AppState = {
     width: 480,
     height: 270,
     isTransparentMode: false,
-    capturedWindows: []
+    capturedWindows: [],
+    opacity: 0.7,
+    visible: true
   },
   modifiedWindows: [],
   lastCleanShutdown: true
@@ -244,6 +246,19 @@ export const App = (): JSX.Element => {
     });
   };
 
+  const updateDropZoneConfig = async (
+    config: Partial<Omit<AppState['dropZone'], 'capturedWindows'>>
+  ): Promise<void> => {
+    try {
+      const nextState = await window.spaceToggle.updateDropZoneConfig(config);
+      setState(nextState);
+    } catch (error) {
+      setMessage(String(error));
+      setMessageType('error');
+      setFailures([]);
+    }
+  };
+
   const addToGroup = async (group: GroupName, identity: WindowIdentity): Promise<void> => {
     try {
       const nextState = await window.spaceToggle.addWindowToGroup(group, identity);
@@ -414,6 +429,10 @@ export const App = (): JSX.Element => {
             items={state.groups.play}
             onRemove={(identity) => removeFromGroup('play', identity)}
           />
+          <DropZoneSettingsPanel
+            dropZone={state.dropZone}
+            onUpdateConfig={updateDropZoneConfig}
+          />
         </section>
       </div>
     </main>
@@ -451,8 +470,76 @@ const GroupPanel = ({ group, items, onRemove }: GroupPanelProps): JSX.Element =>
   </div>
 );
 
+interface DropZoneSettingsPanelProps {
+  dropZone: AppState['dropZone'];
+  onUpdateConfig(config: Partial<Omit<AppState['dropZone'], 'capturedWindows'>>): void;
+}
+
+const DropZoneSettingsPanel = ({ dropZone, onUpdateConfig }: DropZoneSettingsPanelProps): JSX.Element => {
+  const [opacityPercent, setOpacityPercent] = useState(Math.round((dropZone?.opacity ?? 0.7) * 100));
+
+  useEffect(() => {
+    if (dropZone?.opacity !== undefined) {
+      setOpacityPercent(Math.round(dropZone.opacity * 100));
+    }
+  }, [dropZone?.opacity]);
+
+  const handleOpacityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value, 10);
+    setOpacityPercent(value);
+    onUpdateConfig({ opacity: value / 100 });
+  };
+
+  return (
+    <div className="settings-panel">
+      <div className="panel-heading compact" style={{ borderBottom: 'none', paddingBottom: '4px' }}>
+        <div>
+          <p className="eyebrow">Overlay Controls</p>
+          <h2>Drop Zone 설정</h2>
+        </div>
+      </div>
+      <div className="settings-group">
+        <div className="settings-item">
+          <label htmlFor="dz-visibility">드롭존 화면 표시</label>
+          <input
+            id="dz-visibility"
+            type="checkbox"
+            checked={dropZone?.visible ?? true}
+            onChange={(e) => onUpdateConfig({ visible: e.target.checked })}
+          />
+        </div>
+        <div className="settings-item">
+          <label htmlFor="dz-opacity">드롭존 투명도</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'flex-end' }}>
+            <input
+              id="dz-opacity"
+              type="range"
+              min="10"
+              max="100"
+              value={opacityPercent}
+              onChange={handleOpacityChange}
+              disabled={!(dropZone?.visible ?? true)}
+            />
+            <span className="settings-value">{opacityPercent}%</span>
+          </div>
+        </div>
+        <div className="settings-item">
+          <label htmlFor="dz-transparent-mode">캡처된 창 투명화 적용</label>
+          <input
+            id="dz-transparent-mode"
+            type="checkbox"
+            checked={dropZone?.isTransparentMode ?? true}
+            onChange={(e) => onUpdateConfig({ isTransparentMode: e.target.checked })}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DropZoneOverlay = (): JSX.Element => {
   const [state, setState] = useState<AppState>(emptyState);
+  const [isResizing, setIsResizing] = useState(false);
 
   useEffect(() => {
     const refreshState = async () => {
@@ -470,6 +557,83 @@ const DropZoneOverlay = (): JSX.Element => {
 
   const count = state.dropZone?.capturedWindows?.length || 0;
 
+  const startResize = (e: React.MouseEvent, direction: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setIsResizing(true);
+    window.spaceToggle.setIgnoreMouseEvents(false);
+
+    const startX = e.screenX;
+    const startY = e.screenY;
+    const startBounds = {
+      x: state.dropZone.x,
+      y: state.dropZone.y,
+      width: state.dropZone.width,
+      height: state.dropZone.height
+    };
+
+    const handleMouseMove = async (moveEvent: MouseEvent) => {
+      const dx = moveEvent.screenX - startX;
+      const dy = moveEvent.screenY - startY;
+
+      const newBounds = { ...startBounds };
+
+      if (direction.includes('right')) {
+        newBounds.width = Math.max(200, startBounds.width + dx);
+      }
+      if (direction.includes('left')) {
+        const potentialWidth = startBounds.width - dx;
+        if (potentialWidth >= 200) {
+          newBounds.x = startBounds.x + dx;
+          newBounds.width = potentialWidth;
+        }
+      }
+      if (direction.includes('bottom')) {
+        newBounds.height = Math.max(150, startBounds.height + dy);
+      }
+      if (direction.includes('top')) {
+        const potentialHeight = startBounds.height - dy;
+        if (potentialHeight >= 150) {
+          newBounds.y = startBounds.y + dy;
+          newBounds.height = potentialHeight;
+        }
+      }
+
+      try {
+        const updatedState = await window.spaceToggle.updateDropZoneConfig({
+          x: newBounds.x,
+          y: newBounds.y,
+          width: newBounds.width,
+          height: newBounds.height
+        });
+        setState(updatedState);
+      } catch (err) {
+        console.error('Failed to resize dropzone window:', err);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      window.spaceToggle.setIgnoreMouseEvents(true, { forward: true });
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleMouseEnter = () => {
+    window.spaceToggle.setIgnoreMouseEvents(false);
+  };
+
+  const handleMouseLeave = () => {
+    if (!isResizing) {
+      window.spaceToggle.setIgnoreMouseEvents(true, { forward: true });
+    }
+  };
+
   return (
     <div className="dropzone-overlay">
       <div className="dropzone-border">
@@ -479,6 +643,16 @@ const DropZoneOverlay = (): JSX.Element => {
           <p className="dropzone-count">{count} window(s) captured</p>
         </div>
       </div>
+
+      <div className="resize-handle top" onMouseDown={(e) => startResize(e, 'top')} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} />
+      <div className="resize-handle bottom" onMouseDown={(e) => startResize(e, 'bottom')} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} />
+      <div className="resize-handle left" onMouseDown={(e) => startResize(e, 'left')} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} />
+      <div className="resize-handle right" onMouseDown={(e) => startResize(e, 'right')} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} />
+      
+      <div className="resize-handle top-left" onMouseDown={(e) => startResize(e, 'top-left')} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} />
+      <div className="resize-handle top-right" onMouseDown={(e) => startResize(e, 'top-right')} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} />
+      <div className="resize-handle bottom-left" onMouseDown={(e) => startResize(e, 'bottom-left')} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} />
+      <div className="resize-handle bottom-right" onMouseDown={(e) => startResize(e, 'bottom-right')} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} />
     </div>
   );
 };

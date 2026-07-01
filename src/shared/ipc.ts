@@ -9,5 +9,7 @@ export const IPC_CHANNELS = {
   RESTORE_WINDOW_VISUALS: 'spacetoggle:restore-window-visuals',
   FORCE_RESTORE: 'spacetoggle:force-restore',
   GET_HOTKEY_STATUS: 'spacetoggle:get-hotkey-status',
-  UPDATE_HOTKEY: 'spacetoggle:update-hotkey'
+  UPDATE_HOTKEY: 'spacetoggle:update-hotkey',
+  UPDATE_DROPZONE_CONFIG: 'spacetoggle:update-dropzone-config',
+  SET_IGNORE_MOUSE_EVENTS: 'spacetoggle:set-ignore-mouse-events'
 } as const;

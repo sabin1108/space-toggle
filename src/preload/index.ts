@@ -17,7 +17,11 @@ const api: SpaceToggleApi = {
     ipcRenderer.invoke(IPC_CHANNELS.RESTORE_WINDOW_VISUALS, identity),
   forceRestore: () => ipcRenderer.invoke(IPC_CHANNELS.FORCE_RESTORE),
   getHotkeyStatus: () => ipcRenderer.invoke(IPC_CHANNELS.GET_HOTKEY_STATUS),
-  updateHotkey: (accelerator: string) => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_HOTKEY, accelerator)
+  updateHotkey: (accelerator: string) => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_HOTKEY, accelerator),
+  updateDropZoneConfig: (config) => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_DROPZONE_CONFIG, config),
+  setIgnoreMouseEvents: async (ignore, options) => {
+    ipcRenderer.send(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, ignore, options);
+  }
 };
 
 contextBridge.exposeInMainWorld('spaceToggle', api);
