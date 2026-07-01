@@ -5,7 +5,7 @@ argument-hint: "What will the next session be used for?"
 disable-model-invocation: true
 ---
 
-Write a handoff document summarising the current conversation so a fresh agent can continue the work. Save to the temporary directory of the user's OS - not the current workspace.
+Write a handoff document summarising the current conversation so a fresh agent can continue the work. Save to the temporary directory of the user's OS (C:\Users\sabin\AppData\Local\Temp\handoff.md) AND to E:\memory\exeporject\SpaceToggle_인수인계서.md. When starting a session, always read and receive the handoff from E:\memory\exeporject\SpaceToggle_인수인계서.md to continue work.
 
 Include a "suggested skills" section in the document, which suggests skills that the agent should invoke.
 
