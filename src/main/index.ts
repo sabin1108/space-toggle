@@ -97,6 +97,7 @@ const createDropZoneWindow = (stateRepo: StateRepository): BrowserWindow => {
   });
 
   window.setIgnoreMouseEvents(true, { forward: true });
+  window.setOpacity(dz.opacity ?? 0.7);
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     window.loadURL(`${process.env.ELECTRON_RENDERER_URL}#dropzone`);
@@ -106,7 +107,9 @@ const createDropZoneWindow = (stateRepo: StateRepository): BrowserWindow => {
   }
 
   window.once('ready-to-show', () => {
-    window.show();
+    if (dz.visible) {
+      window.show();
+    }
   });
 
   return window;
@@ -182,7 +185,7 @@ if (!singleInstanceLock) {
     const hotkeyStatus = hotkeys.register(stateRepository.get().customHotkey);
     log(`Hotkey registered: ${hotkeyStatus.registered}`);
 
-    registerIpcHandlers(stateRepository, windowManager, hotkeys);
+    registerIpcHandlers(stateRepository, windowManager, hotkeys, () => dropZoneWindow);
     createTray(mainWindow, windowManager);
     log('IPC and tray initialized');
 

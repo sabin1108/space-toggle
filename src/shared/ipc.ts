@@ -14,6 +14,8 @@ export const IPC_CHANNELS = {
   DELETE_CATEGORY: 'spacetoggle:delete-category',
   RENAME_CATEGORY: 'spacetoggle:rename-category',
   ADD_WINDOW_TO_CATEGORY: 'spacetoggle:add-window-to-category',
-  REMOVE_WINDOW_FROM_CATEGORY: 'spacetoggle:remove-window-from-category'
+  REMOVE_WINDOW_FROM_CATEGORY: 'spacetoggle:remove-window-from-category',
+  UPDATE_DROPZONE_CONFIG: 'spacetoggle:update-dropzone-config',
+  SET_IGNORE_MOUSE_EVENTS: 'spacetoggle:set-ignore-mouse-events'
 } as const;
 

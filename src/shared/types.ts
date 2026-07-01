@@ -39,6 +39,8 @@ export interface DropZoneState {
   height: number;
   isTransparentMode: boolean; // if true, captured windows become transparent. If false, off-screen fallback.
   capturedWindows: WindowIdentity[];
+  opacity: number;
+  visible: boolean;
 }
 
 export interface ModifiedWindowRecord {
@@ -88,6 +90,8 @@ export interface SpaceToggleApi {
   renameCategory(id: string, name: string): Promise<AppState>;
   addWindowToCategory(categoryId: string, identity: WindowIdentity): Promise<AppState>;
   removeWindowFromCategory(categoryId: string, identity: WindowIdentity): Promise<AppState>;
+  updateDropZoneConfig(config: Partial<Omit<DropZoneState, 'capturedWindows'>>): Promise<AppState>;
+  setIgnoreMouseEvents(ignore: boolean, options?: { forward: boolean }): Promise<void>;
 }
 
 

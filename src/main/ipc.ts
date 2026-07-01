@@ -1,7 +1,7 @@
-import { ipcMain } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import { z } from 'zod';
 import { IPC_CHANNELS } from '../shared/ipc';
-import type { GroupName, Mode, WindowIdentity } from '../shared/types';
+import type { GroupName, Mode, WindowIdentity, DropZoneState } from '../shared/types';
 import type { HotkeyController } from './hotkeys';
 import type { StateRepository } from './state';
 import type { WindowManager } from './window-manager';
@@ -26,7 +26,8 @@ const categoryIdentitySchema = z.object({
 export const registerIpcHandlers = (
   state: StateRepository,
   windows: WindowManager,
-  hotkeys: HotkeyController
+  hotkeys: HotkeyController,
+  getDropZoneWindow: () => BrowserWindow | null
 ): void => {
   ipcMain.handle(IPC_CHANNELS.GET_STATE, () => state.get());
   ipcMain.handle(IPC_CHANNELS.LIST_WINDOWS, () => windows.listWindows());
@@ -87,6 +88,47 @@ export const registerIpcHandlers = (
   ipcMain.handle(IPC_CHANNELS.REMOVE_WINDOW_FROM_CATEGORY, (_event, payload: unknown) => {
     const parsed = categoryIdentitySchema.parse(payload);
     return windows.removeWindowFromCategory(parsed.categoryId, parsed.identity);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.UPDATE_DROPZONE_CONFIG, (_event, payload: unknown) => {
+    const config = payload as Partial<Omit<DropZoneState, 'capturedWindows'>>;
+    const nextState = state.updateDropZoneConfig(config);
+    const dzWin = getDropZoneWindow();
+    if (dzWin && !dzWin.isDestroyed()) {
+      const dz = nextState.dropZone;
+      if (
+        config.x !== undefined ||
+        config.y !== undefined ||
+        config.width !== undefined ||
+        config.height !== undefined
+      ) {
+        dzWin.setBounds({
+          x: Math.round(dz.x),
+          y: Math.round(dz.y),
+          width: Math.round(dz.width),
+          height: Math.round(dz.height)
+        });
+      }
+      if (config.opacity !== undefined) {
+        dzWin.setOpacity(dz.opacity);
+      }
+      if (config.visible !== undefined) {
+        if (dz.visible) {
+          dzWin.show();
+        } else {
+          dzWin.hide();
+        }
+      }
+    }
+    return nextState;
+  });
+
+  ipcMain.on(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, (event, ignore: boolean, options?: { forward: boolean }) => {
+    const webContents = event.sender;
+    const win = BrowserWindow.fromWebContents(webContents);
+    if (win && !win.isDestroyed()) {
+      win.setIgnoreMouseEvents(ignore, options);
+    }
   });
 };
 

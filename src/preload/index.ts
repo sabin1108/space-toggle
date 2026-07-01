@@ -24,7 +24,11 @@ const api: SpaceToggleApi = {
   addWindowToCategory: (categoryId: string, identity: WindowIdentity) =>
     ipcRenderer.invoke(IPC_CHANNELS.ADD_WINDOW_TO_CATEGORY, { categoryId, identity }),
   removeWindowFromCategory: (categoryId: string, identity: WindowIdentity) =>
-    ipcRenderer.invoke(IPC_CHANNELS.REMOVE_WINDOW_FROM_CATEGORY, { categoryId, identity })
+    ipcRenderer.invoke(IPC_CHANNELS.REMOVE_WINDOW_FROM_CATEGORY, { categoryId, identity }),
+  updateDropZoneConfig: (config) => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_DROPZONE_CONFIG, config),
+  setIgnoreMouseEvents: async (ignore, options) => {
+    ipcRenderer.send(IPC_CHANNELS.SET_IGNORE_MOUSE_EVENTS, ignore, options);
+  }
 };
 
 contextBridge.exposeInMainWorld('spaceToggle', api);

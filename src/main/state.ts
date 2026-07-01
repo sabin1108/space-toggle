@@ -1,5 +1,5 @@
 import Store from 'electron-store';
-import type { AppState, Category, Mode, WindowIdentity, ModifiedWindowRecord } from '../shared/types';
+import type { AppState, Category, Mode, WindowIdentity, ModifiedWindowRecord, DropZoneState } from '../shared/types';
 
 const SCHEMA_VERSION = 2;
 
@@ -16,7 +16,9 @@ const defaultState: AppState = {
     width: 480,
     height: 270,
     isTransparentMode: true, // 투명도 기반의 오버레이 창 활성화 상태 여부
-    capturedWindows: []
+    capturedWindows: [],
+    opacity: 0.7,
+    visible: true
   },
   modifiedWindows: [],
   lastCleanShutdown: true
@@ -64,12 +66,30 @@ export class StateRepository {
   }
 
   get(): AppState {
-    return structuredClone(this.store.store);
+    const data = structuredClone(this.store.store);
+    if (data.dropZone) {
+      if (data.dropZone.opacity === undefined) {
+        data.dropZone.opacity = 0.7;
+      }
+      if (data.dropZone.visible === undefined) {
+        data.dropZone.visible = true;
+      }
+    }
+    return data;
   }
 
   replace(next: AppState): AppState {
     this.store.store = structuredClone(next);
     return this.get();
+  }
+
+  updateDropZoneConfig(config: Partial<Omit<DropZoneState, 'capturedWindows'>>): AppState {
+    const next = this.get();
+    next.dropZone = {
+      ...next.dropZone,
+      ...config
+    };
+    return this.replace(next);
   }
 
   markSessionStarted(): void {
