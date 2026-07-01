@@ -62,3 +62,18 @@ Harden the app state storage: save the original styles (window styles, positions
 
 ### Blocked by
 - [이슈 #11] Opacity Control & Chrome/Edge Fallback Mode
+
+---
+
+## [이슈 #16] 드롭존 크기 조절 및 투명도/노출 설정 고도화 - CLOSED
+
+### What to build
+드롭존 엣지 영역 드래그를 통한 크기 조절 기능 구현, 메인 설정 창 내 드롭존 창의 투명도 슬라이더 및 캡처 창 노출여부 토글 버튼 구현.
+
+### Acceptance criteria
+- [x] 드롭존 엣지 영역 드래그 반응식 창 크기 조절 기능 성공.
+- [x] 메인 설정창 내 슬라이더 및 토글스위치 UI 구성 완료.
+- [x] 투명도 및 오버레이 노출 여부 실시간 윈도우 동기화 성공.
+
+### Blocked by
+- [이슈 #12] System Tray Restore & Crash Recovery Hardening

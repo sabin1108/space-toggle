@@ -18,3 +18,8 @@
 - [x] Verification and automated tests
   - [x] verify-qa.cjs: Update QA integration tests for Drop Zone & Recovery
   - [x] Run test:qa script to ensure everything passes
+- [x] 이슈 #16: 드롭존 크기 조절 및 투명도/노출 설정 고도화
+  - [x] types.ts/preload: Add opacity, visible state, and new config/ignoreMouseEvents APIs
+  - [x] index.ts/ipc.ts/state.ts: Sync bounds, opacity, and visibility config and ignoreMouseEvents updates in real-time
+  - [x] App.tsx/styles.css: Build Settings panel controls and Dropzone resizing drag handles
+
