@@ -6,6 +6,7 @@ import {
   Info,
   ListRestart,
   MonitorUp,
+  Plus,
   RefreshCw,
   RotateCcw,
   ShieldAlert
@@ -84,6 +85,15 @@ export const App = (): JSX.Element => {
 
   // 카테고리(그룹) 생성용 상태 변수
   const [newCatName, setNewCatName] = useState('');
+  const [activePopoverWindowId, setActivePopoverWindowId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      setActivePopoverWindowId(null);
+    };
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
 
   const toggleSelect = (id: string): void => {
     setSelectedIds((prev) => {
@@ -464,50 +474,105 @@ export const App = (): JSX.Element => {
             />
           </div>
           <div className="window-list">
-            {filteredWindows.map((item) => (
-              <article className="window-row" key={item.id}>
-                <input
-                  type="checkbox"
-                  className="window-checkbox"
-                  checked={selectedIds.has(item.id)}
-                  onChange={() => toggleSelect(item.id)}
-                />
-                <div className="window-thumbnail-container">
-                  {item.thumbnail ? (
-                    <img src={item.thumbnail} alt={item.title} className="window-thumbnail" />
-                  ) : (
-                    <div className="window-thumbnail-placeholder">썸네일 없음</div>
-                  )}
-                </div>
-                <div className="window-main">
-                  <strong>{item.title}</strong>
-                  <span>{basename(item.processPath)}</span>
-                  <small>{item.className ?? '클래스 이름 없음'}</small>
-                </div>
-                <div className="row-actions">
-                  <select
-                    className="category-add-select"
-                    value=""
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        addToCategory(e.target.value, item.identity);
-                      }
-                    }}
-                  >
-                    <option value="">+ 카테고리 추가</option>
-                    {state.categories.map((cat) => {
-                      const alreadyIn = cat.windows.some((w) => identityKey(w) === identityKey(item.identity));
-                      return (
-                        <option key={cat.id} value={cat.id} disabled={alreadyIn}>
-                          {cat.name}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <button onClick={() => restoreWindowVisuals(item.identity)}>복구</button>
-                </div>
-              </article>
-            ))}
+            {filteredWindows.map((item) => {
+              const isModified = state.modifiedWindows.some(
+                (mw) => identityKey(mw.identity) === identityKey(item.identity)
+              );
+              const isCaptured = state.dropZone.capturedWindows.some(
+                (cw) => identityKey(cw) === identityKey(item.identity)
+              );
+              const itemCategories = state.categories.filter((cat) =>
+                cat.windows.some((w) => identityKey(w) === identityKey(item.identity))
+              );
+
+              return (
+                <article
+                  className={`window-row${isModified ? ' modified' : ''}${
+                    isCaptured ? ' captured' : ''
+                  }`}
+                  key={item.id}
+                >
+                  <input
+                    type="checkbox"
+                    className="window-checkbox"
+                    checked={selectedIds.has(item.id)}
+                    onChange={() => toggleSelect(item.id)}
+                  />
+                  <div className="window-thumbnail-container">
+                    {item.thumbnail ? (
+                      <img src={item.thumbnail} alt={item.title} className="window-thumbnail" />
+                    ) : (
+                      <div className="window-thumbnail-placeholder">썸네일 없음</div>
+                    )}
+                  </div>
+                  <div className="window-main">
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                      <strong>{item.title}</strong>
+                      {isCaptured && <span className="status-badge">드롭존</span>}
+                      {!isCaptured && isModified && <span className="status-badge">숨김</span>}
+                    </div>
+                    <span>{basename(item.processPath)}</span>
+                    <small>{item.className ?? '클래스 이름 없음'}</small>
+                    {itemCategories.length > 0 && (
+                      <div className="window-badges">
+                        {itemCategories.map((cat) => (
+                          <span key={cat.id} className="category-badge">
+                            {cat.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="row-actions">
+                    <div className="action-dropdown-container">
+                      <button
+                        className="plus-btn"
+                        title="카테고리에 추가"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActivePopoverWindowId(
+                            activePopoverWindowId === item.id ? null : item.id
+                          );
+                        }}
+                      >
+                        <Plus size={14} />
+                      </button>
+                      {activePopoverWindowId === item.id && (
+                        <div className="category-popover">
+                          {state.categories.map((cat) => {
+                            const alreadyIn = cat.windows.some(
+                              (w) => identityKey(w) === identityKey(item.identity)
+                            );
+                            return (
+                              <button
+                                key={cat.id}
+                                className="category-popover-item"
+                                disabled={alreadyIn}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  await addToCategory(cat.id, item.identity);
+                                  setActivePopoverWindowId(null);
+                                }}
+                              >
+                                {cat.name}
+                              </button>
+                            );
+                          })}
+                          {state.categories.length === 0 && (
+                            <div className="muted" style={{ padding: '6px' }}>
+                              카테고리 없음
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {(isModified || isCaptured) && (
+                      <button onClick={() => restoreWindowVisuals(item.identity)}>복구</button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
             {filteredWindows.length === 0 && (
               <div className="empty-state">
                 <ListRestart size={22} />
@@ -576,6 +641,10 @@ export const App = (): JSX.Element => {
           <DropZoneSettingsPanel
             dropZone={state.dropZone}
             onUpdateConfig={updateDropZoneConfig}
+          />
+          <DropZoneCapturedList
+            capturedWindows={state.dropZone?.capturedWindows || []}
+            onRestore={restoreWindowVisuals}
           />
         </section>
       </div>
@@ -730,6 +799,41 @@ const DropZoneSettingsPanel = ({ dropZone, onUpdateConfig }: DropZoneSettingsPan
             onChange={(e) => onUpdateConfig({ isTransparentMode: e.target.checked })}
           />
         </div>
+      </div>
+    </div>
+  );
+};
+
+interface DropZoneCapturedListProps {
+  capturedWindows: WindowIdentity[];
+  onRestore(identity: WindowIdentity): void;
+}
+
+const DropZoneCapturedList = ({ capturedWindows, onRestore }: DropZoneCapturedListProps): JSX.Element => {
+  return (
+    <div className="captured-panel">
+      <div className="panel-heading compact" style={{ borderBottom: 'none', paddingBottom: '4px', paddingTop: '10px' }}>
+        <div>
+          <p className="eyebrow">캡처 관리</p>
+          <h2>드롭존 캡처된 창 목록</h2>
+        </div>
+      </div>
+      <div className="captured-list">
+        {capturedWindows.map((item) => {
+          const key = [item.processPath, item.titlePattern, item.className ?? ''].join('|');
+          return (
+            <div className="captured-item" key={key}>
+              <div className="captured-info">
+                <strong>{item.titlePattern}</strong>
+                <span>{basename(item.processPath)}</span>
+              </div>
+              <button onClick={() => onRestore(item)}>복구</button>
+            </div>
+          );
+        })}
+        {capturedWindows.length === 0 && (
+          <p className="muted" style={{ paddingTop: '8px', margin: 0 }}>드롭존에 캡처된 창이 없습니다.</p>
+        )}
       </div>
     </div>
   );
